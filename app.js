@@ -59,7 +59,11 @@ const els = {
   noteInput: document.querySelector("#noteInput"),
   closeReview: document.querySelector("#closeReview"),
   notifyBtn: document.querySelector("#notifyBtn"),
+  installWrap: document.querySelector("#installWrap"),
   installBtn: document.querySelector("#installBtn"),
+  installHelp: document.querySelector("#installHelp"),
+  installDeviceText: document.querySelector("#installDeviceText"),
+  installNowBtn: document.querySelector("#installNowBtn"),
 };
 
 document.querySelector("#dateInput").valueAsDate = new Date();
@@ -133,12 +137,21 @@ els.notifyBtn.addEventListener("click", async () => {
   }
 });
 
-els.installBtn.addEventListener("click", async () => {
+els.installBtn.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  toggleInstallHelp();
+});
+
+els.installNowBtn.addEventListener("click", async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
   if (!deferredInstallPrompt) return;
   deferredInstallPrompt.prompt();
   await deferredInstallPrompt.userChoice;
   deferredInstallPrompt = null;
-  els.installBtn.hidden = true;
+  renderInstallHelp();
+  closeInstallHelp();
 });
 
 els.ivyForm.addEventListener("submit", (event) => {
@@ -147,18 +160,36 @@ els.ivyForm.addEventListener("submit", (event) => {
 });
 
 els.topicPanelToggle.addEventListener("click", () => {
-  setTopicPanelCollapsed(!els.topicPanel.classList.contains("is-collapsed"));
+  toggleTopicPanel();
+});
+
+els.topicPanelToggle.addEventListener("touchend", (event) => {
+  event.preventDefault();
+  toggleTopicPanel();
+}, { passive: false });
+
+document.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target : event.target.parentElement;
+  if (!target?.closest(".help-wrap")) closeHelpPopovers();
+  if (!target?.closest("#installWrap")) closeInstallHelp();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  closeHelpPopovers();
+  closeInstallHelp();
 });
 
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;
-  els.installBtn.hidden = false;
+  renderInstallHelp();
 });
 
 window.addEventListener("appinstalled", () => {
   deferredInstallPrompt = null;
-  els.installBtn.hidden = true;
+  renderInstallHelp();
+  closeInstallHelp();
 });
 
 document.querySelectorAll(".tab").forEach((tab) => {
@@ -173,6 +204,8 @@ setInterval(() => notifyDueReviews(false), 60_000);
 registerServiceWorker();
 cleanupOldCompletedIvyTasks();
 setTopicPanelCollapsed(localStorage.getItem(topicPanelStateKey) === "true");
+setupHelpPopovers();
+renderInstallHelp();
 render();
 
 function registerServiceWorker() {
@@ -214,6 +247,76 @@ function setTopicPanelCollapsed(isCollapsed) {
   els.topicPanelToggle.textContent = isCollapsed ? "Mostrar" : "Ocultar";
   els.topicPanelToggle.setAttribute("aria-expanded", String(!isCollapsed));
   localStorage.setItem(topicPanelStateKey, String(isCollapsed));
+}
+
+function toggleTopicPanel() {
+  setTopicPanelCollapsed(!els.topicPanel.classList.contains("is-collapsed"));
+}
+
+function setupHelpPopovers() {
+  document.querySelectorAll(".help-wrap").forEach((wrap) => {
+    const button = wrap.querySelector(".help-btn");
+    if (!button) return;
+    button.setAttribute("aria-expanded", "false");
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const willOpen = !wrap.classList.contains("is-open");
+      closeHelpPopovers();
+      closeInstallHelp();
+      if (willOpen) {
+        wrap.classList.add("is-open");
+        button.setAttribute("aria-expanded", "true");
+      }
+    });
+  });
+}
+
+function closeHelpPopovers() {
+  document.querySelectorAll(".help-wrap.is-open").forEach((wrap) => {
+    wrap.classList.remove("is-open");
+    wrap.querySelector(".help-btn")?.setAttribute("aria-expanded", "false");
+  });
+}
+
+function toggleInstallHelp() {
+  const willOpen = els.installHelp.hidden;
+  closeHelpPopovers();
+  if (willOpen) {
+    renderInstallHelp();
+    els.installHelp.hidden = false;
+    els.installWrap.classList.add("is-open");
+    els.installBtn.setAttribute("aria-expanded", "true");
+    return;
+  }
+  closeInstallHelp();
+}
+
+function closeInstallHelp() {
+  els.installHelp.hidden = true;
+  els.installWrap.classList.remove("is-open");
+  els.installBtn.setAttribute("aria-expanded", "false");
+}
+
+function renderInstallHelp() {
+  const userAgent = navigator.userAgent || "";
+  const isIos = /iphone|ipad|ipod/i.test(userAgent);
+  const isAndroid = /android/i.test(userAgent);
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+
+  if (isStandalone) {
+    els.installDeviceText.textContent = "Ya la tienes abierta como app. Para actualizarla, ciérrala y vuelve a abrirla después de publicar cambios.";
+  } else if (isIos) {
+    els.installDeviceText.textContent = "En iPhone/iPad: abre esta página en Safari, toca Compartir y elige Añadir a pantalla de inicio.";
+  } else if (isAndroid) {
+    els.installDeviceText.textContent = deferredInstallPrompt
+      ? "En Android/Chrome puedes instalarla ahora o usar el menú de los tres puntos y tocar Instalar app."
+      : "En Android/Chrome: abre el menú de los tres puntos y toca Instalar app o Añadir a pantalla de inicio.";
+  } else {
+    els.installDeviceText.textContent = "En ordenador: usa el icono de instalar de la barra del navegador o el menú del navegador. En móvil, abre esta URL y añádela a pantalla de inicio.";
+  }
+
+  els.installNowBtn.hidden = !deferredInstallPrompt || Boolean(isStandalone);
 }
 
 function normalizeState(raw) {

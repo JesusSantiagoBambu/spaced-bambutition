@@ -26,9 +26,16 @@
         <button class="icon-btn" id="notifyBtn" title="Activar notificaciones" aria-label="Activar notificaciones">
           <span aria-hidden="true">🔔</span>
         </button>
-        <button class="icon-btn" id="installBtn" title="Instalar app" aria-label="Instalar app" hidden>
-          <span aria-hidden="true">📲</span>
-        </button>
+        <span class="install-wrap" id="installWrap">
+          <button class="icon-btn" id="installBtn" title="Cómo instalar la app" aria-label="Cómo instalar la app" aria-expanded="false" aria-controls="installHelp" type="button">
+            <span aria-hidden="true">📲</span>
+          </button>
+          <span class="install-popover" id="installHelp" role="tooltip" hidden>
+            <strong>Instalar la app</strong>
+            <span id="installDeviceText">Abre esta app desde el navegador del dispositivo y añádela a la pantalla de inicio.</span>
+            <button class="primary install-now" id="installNowBtn" type="button" hidden>Instalar ahora</button>
+          </span>
+        </span>
       </div>
     </header>
 
