@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Spaced Bambutition">
+  <rect width="512" height="512" rx="112" fill="#09A5BC"/>
+  <circle cx="378" cy="128" r="56" fill="#F4BF4F"/>
+  <path fill="#FBFAF6" d="M128 148h184c45 0 76 29 76 70 0 26-13 48-36 60 30 10 50 35 50 70 0 48-36 82-91 82H128V148Zm75 111h89c18 0 30-11 30-27s-12-27-30-27h-89v54Zm0 112h101c20 0 33-12 33-30s-13-30-33-30H203v60Z"/>
+  <path fill="#172126" fill-opacity=".16" d="M95 422c53 28 111 42 173 42 55 0 104-10 149-31-38 48-96 79-161 79-66 0-124-31-161-90Z"/>
+</svg>

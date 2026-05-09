@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#09A5BC" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Spaced Bambutition" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Spaced Bambutition</title>
+    <link rel="manifest" href="app.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">🧠 Curva del olvido + rendimiento</p>
+        <h1>Spaced Bambutition</h1>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="notifyBtn" title="Activar notificaciones" aria-label="Activar notificaciones">
+          <span aria-hidden="true">🔔</span>
+        </button>
+        <button class="icon-btn" id="installBtn" title="Instalar app" aria-label="Instalar app" hidden>
+          <span aria-hidden="true">📲</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="workspace">
+        <section class="main-panel">
+          <nav class="tabs" aria-label="Vistas">
+            <button class="tab active" data-view="today">✅ Hoy</button>
+            <button class="tab" data-view="calendar">🗓️ Calendario</button>
+            <button class="tab" data-view="progress">📈 Progreso</button>
+            <button class="tab" data-view="rewards">🎁 Recompensas</button>
+          </nav>
+
+          <div id="todayView" class="view active">
+            <div class="section-title">
+              <h2 class="label-row">
+                ✅ Repasos pendientes
+                <span class="help-wrap">
+                  <button class="help-btn" type="button" aria-label="Ayuda: repasos pendientes">?</button>
+                  <span class="help-popover" role="tooltip">Es lo que toca resolver hoy. Si algo está atrasado, aparece aquí hasta que se evalúe o se salte.</span>
+                </span>
+              </h2>
+              <span id="dueCount" class="muted">0 pendientes</span>
+            </div>
+            <div id="dueList" class="review-list"></div>
+
+            <section class="ivy-section" aria-labelledby="ivyTitle">
+              <div class="section-title">
+                <h2 id="ivyTitle" class="label-row">
+                  🍅 Ivy Lee + Pomodoros
+                  <span class="help-wrap">
+                    <button class="help-btn" type="button" aria-label="Ayuda: Ivy Lee">?</button>
+                    <span class="help-popover" role="tooltip">Planifica hasta 6 tareas clave para hoy, asigna pomodoros y marca las completadas para sumar puntos.</span>
+                  </span>
+                </h2>
+                <span id="ivyCount" class="muted">0/6 tareas</span>
+              </div>
+              <div id="ivyStats" class="ivy-stats" aria-label="Estadísticas de pomodoros"></div>
+              <form id="ivyForm" class="ivy-form">
+                <input id="ivyTaskInput" required maxlength="90" placeholder="Tarea prioritaria de hoy" />
+                <input id="ivyPomodoroInput" required type="number" min="1" max="8" value="1" aria-label="Pomodoros" />
+                <select id="ivyDifficultyInput" aria-label="Dificultad">
+                  <option value="green">🟢 Fácil</option>
+                  <option value="yellow" selected>🟡 Media</option>
+                  <option value="red">🔴 Difícil</option>
+                </select>
+                <button class="primary" type="submit">➕ Añadir</button>
+              </form>
+              <div id="ivyList" class="ivy-list"></div>
+            </section>
+          </div>
+
+          <div id="calendarView" class="view">
+            <div class="section-title">
+              <h2>🗓️ Próximos repasos</h2>
+              <span class="muted label-row">
+                30 dias
+                <span class="help-wrap">
+                  <button class="help-btn" type="button" aria-label="Ayuda: calendario">?</button>
+                  <span class="help-popover" role="tooltip">Muestra los repasos pendientes de los próximos 30 días y si han sido adaptados.</span>
+                </span>
+              </span>
+            </div>
+            <div id="calendarList" class="calendar-list"></div>
+          </div>
+
+          <div id="progressView" class="view">
+            <div class="section-title">
+              <h2>📈 Rendimiento</h2>
+              <span class="muted label-row">
+                <span id="averageScore">Sin notas</span>
+                <span class="help-wrap">
+                  <button class="help-btn" type="button" aria-label="Ayuda: rendimiento">?</button>
+                  <span class="help-popover" role="tooltip">Resume nota media, dominio y factor de memoria de cada temario.</span>
+                </span>
+              </span>
+            </div>
+            <div id="progressList" class="progress-grid"></div>
+          </div>
+
+          <div id="rewardsView" class="view">
+            <div class="section-title">
+              <h2>🎁 Recompensas</h2>
+              <span class="muted label-row">
+                <span id="rewardPoints">0 puntos</span>
+                <span class="help-wrap">
+                  <button class="help-btn" type="button" aria-label="Ayuda: recompensas">?</button>
+                  <span class="help-popover" role="tooltip">Son premios que el alumno define y canjea con los puntos conseguidos.</span>
+                </span>
+              </span>
+            </div>
+            <form id="rewardForm" class="reward-form">
+              <input id="rewardName" required placeholder="Ir al cine" />
+              <input id="rewardCost" required type="number" min="10" step="5" value="100" />
+              <button class="primary" type="submit">➕ Añadir</button>
+            </form>
+            <div id="rewardList" class="reward-list"></div>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <div class="panel-head">
+            <h2>➕ Nuevo temario</h2>
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: nuevo temario">?</button>
+              <span class="help-popover" role="tooltip">Crea un plan de repasos desde la fecha en la que se estudió ese tema.</span>
+            </span>
+          </div>
+          <form id="topicForm" class="stack">
+            <div class="field-group">
+              <div class="field-label-row">
+                <label class="field-label" for="subjectInput">🎓 Asignatura/Oposición</label>
+                <span class="help-wrap">
+                  <button class="help-btn" type="button" aria-label="Ayuda: asignatura u oposición">?</button>
+                  <span class="help-popover" role="tooltip">Puedes poner una asignatura, una oposición o un bloque general de estudio.</span>
+                </span>
+              </div>
+              <input id="subjectInput" name="subject" list="subjectOptions" required placeholder="Administrativo del Estado" />
+              <datalist id="subjectOptions"></datalist>
+            </div>
+            <div class="field-group">
+              <div class="field-label-row">
+                <label class="field-label" for="topicInput">📘 Tema o bloque</label>
+                <span class="help-wrap">
+                  <button class="help-btn" type="button" aria-label="Ayuda: tema o bloque">?</button>
+                  <span class="help-popover" role="tooltip">Es la unidad concreta que quieres meter en la curva de repasos.</span>
+                </span>
+              </div>
+              <input id="topicInput" name="topic" required placeholder="Tema 4. Acto administrativo" />
+            </div>
+            <div class="field-group">
+              <div class="field-label-row">
+                <label class="field-label" for="dateInput">📅 Fecha de estudio</label>
+                <span class="help-wrap">
+                  <button class="help-btn" type="button" aria-label="Ayuda: fecha de estudio">?</button>
+                  <span class="help-popover" role="tooltip">La app programa el primer repaso 24 horas después de esta fecha.</span>
+                </span>
+              </div>
+              <input id="dateInput" name="firstDate" type="date" required />
+            </div>
+            <button class="primary" type="submit">➕ Crear plan</button>
+          </form>
+
+          <div class="curve-box">
+            <h3 class="label-row">
+              🧠 Secuencia
+              <span class="help-wrap">
+                <button class="help-btn" type="button" aria-label="Ayuda: secuencia">?</button>
+                <span class="help-popover" role="tooltip">Es el plan base. Luego se acerca o se separa según la nota de cada repaso.</span>
+              </span>
+            </h3>
+            <div class="chips" id="curveChips"></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="summary-band" aria-label="Resumen">
+        <div class="stat">
+          <span class="stat-label label-row">
+            ⭐ Puntos
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: puntos">?</button>
+              <span class="help-popover" role="tooltip">Suben al completar repasos y pueden bajar si se saltan. Sirven para canjear recompensas.</span>
+            </span>
+          </span>
+          <strong id="pointsStat">0</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label label-row">
+            🔥 Racha
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: racha">?</button>
+              <span class="help-popover" role="tooltip">Cuenta los días seguidos en los que se completa al menos un repaso.</span>
+            </span>
+          </span>
+          <strong id="streakStat">0 dias</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label label-row">
+            🏆 Nivel
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: nivel">?</button>
+              <span class="help-popover" role="tooltip">Sube cada 250 puntos para dar sensación de progreso acumulado.</span>
+            </span>
+          </span>
+          <strong id="levelStat">1</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label label-row">
+            ✅ Hoy
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: hoy">?</button>
+              <span class="help-popover" role="tooltip">Número de repasos que toca resolver hoy o que están atrasados.</span>
+            </span>
+          </span>
+          <strong id="todayStat">0 repasos</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label label-row">
+            ⚖️ Carga
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: carga">?</button>
+              <span class="help-popover" role="tooltip">Indica cuántos repasos hay programados hoy sobre el máximo recomendado de 3.</span>
+            </span>
+          </span>
+          <strong id="loadStat">0/3</strong>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="reviewDialog">
+      <form method="dialog" id="reviewForm" class="dialog-body">
+        <div>
+          <p class="eyebrow" id="reviewSubject">Repaso</p>
+          <h2 id="reviewTitle">Tema</h2>
+        </div>
+        <label>
+          Nota del repaso
+          <input id="scoreInput" type="range" min="0" max="10" step="0.5" value="7" />
+          <output id="scoreOutput">7</output>
+        </label>
+        <label>
+          Comentario opcional
+          <textarea id="noteInput" rows="3" placeholder="Qué ha fallado, qué conviene reforzar..."></textarea>
+        </label>
+        <div class="dialog-actions">
+          <button type="button" class="ghost" id="closeReview">Cancelar</button>
+          <button class="primary" value="confirm">Guardar repaso</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="emptyStateTemplate">
+      <div class="empty-state">
+        <strong>✨ Todo en orden.</strong>
+      </div>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
