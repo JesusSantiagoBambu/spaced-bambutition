@@ -18,8 +18,15 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
+  width: 100%;
+  overflow-x: hidden;
   min-height: 100vh;
   color: var(--ink);
   background:
@@ -30,7 +37,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -44,6 +52,21 @@ button {
   justify-content: space-between;
   gap: 1rem;
   padding: 1.4rem clamp(1rem, 4vw, 3rem);
+}
+
+.topbar > div:first-child,
+.app-shell,
+.workspace,
+.panel,
+.main-panel,
+.view,
+.review-card,
+.ivy-card,
+.calendar-row,
+.reward-card,
+.topic-card,
+.stat {
+  min-width: 0;
 }
 
 .eyebrow {
@@ -66,6 +89,7 @@ h1 {
   margin-bottom: 0;
   font-size: clamp(2rem, 7vw, 4.5rem);
   line-height: 0.95;
+  overflow-wrap: anywhere;
 }
 
 h2 {
@@ -80,7 +104,10 @@ h3 {
 
 .top-actions {
   display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 0.65rem;
+  justify-content: flex-end;
 }
 
 .icon-btn {
@@ -325,6 +352,7 @@ textarea {
 .tabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 100%;
   border-bottom: 1px solid var(--line);
   background: #f5f8f6;
 }
@@ -480,12 +508,14 @@ textarea {
 .card-title {
   margin: 0 0 0.25rem;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .card-meta {
   margin: 0;
   color: var(--muted);
   font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
 
 .card-note {
@@ -523,6 +553,7 @@ textarea {
 .ivy-actions,
 .reward-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.55rem;
   align-items: center;
 }
@@ -657,6 +688,17 @@ dialog::backdrop {
 }
 
 @media (max-width: 820px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 1rem;
+  }
+
+  .app-shell {
+    width: calc(100% - 1rem);
+    margin-bottom: 1rem;
+  }
+
   .summary-band,
   .workspace {
     grid-template-columns: 1fr;
@@ -673,12 +715,26 @@ dialog::backdrop {
   .tabs {
     display: flex;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
     scrollbar-width: thin;
   }
 
   .tab {
     min-width: 8.5rem;
     flex: 0 0 auto;
+  }
+
+  .view {
+    padding: 0.8rem;
+  }
+
+  .panel,
+  .review-card,
+  .ivy-card,
+  .calendar-row,
+  .reward-card,
+  .topic-card {
+    padding: 0.8rem;
   }
 
   .review-card,
@@ -701,5 +757,45 @@ dialog::backdrop {
 
   .topbar {
     align-items: start;
+  }
+}
+
+@media (max-width: 420px) {
+  h1 {
+    font-size: 1.75rem;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .top-actions {
+    justify-content: flex-start;
+  }
+
+  .summary-band {
+    grid-template-columns: 1fr;
+  }
+
+  .section-title,
+  .panel-head {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .label-row,
+  .field-label-row,
+  .field-label {
+    flex-wrap: wrap;
+  }
+
+  .primary,
+  .ghost,
+  .tab {
+    width: 100%;
+  }
+
+  .tabs .tab {
+    width: auto;
   }
 }
