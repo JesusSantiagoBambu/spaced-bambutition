@@ -129,58 +129,63 @@
           </div>
         </section>
 
-        <aside class="panel">
+        <aside class="panel topic-panel" id="topicPanel">
           <div class="panel-head">
-            <h2>➕ Nuevo temario</h2>
-            <span class="help-wrap">
-              <button class="help-btn" type="button" aria-label="Ayuda: nuevo temario">?</button>
-              <span class="help-popover" role="tooltip">Crea un plan de repasos desde la fecha en la que se estudió ese tema.</span>
-            </span>
-          </div>
-          <form id="topicForm" class="stack">
-            <div class="field-group">
-              <div class="field-label-row">
-                <label class="field-label" for="subjectInput">🎓 Asignatura/Oposición</label>
-                <span class="help-wrap">
-                  <button class="help-btn" type="button" aria-label="Ayuda: asignatura u oposición">?</button>
-                  <span class="help-popover" role="tooltip">Puedes poner una asignatura, una oposición o un bloque general de estudio.</span>
-                </span>
-              </div>
-              <input id="subjectInput" name="subject" list="subjectOptions" required placeholder="Administrativo del Estado" />
-              <datalist id="subjectOptions"></datalist>
-            </div>
-            <div class="field-group">
-              <div class="field-label-row">
-                <label class="field-label" for="topicInput">📘 Tema o bloque</label>
-                <span class="help-wrap">
-                  <button class="help-btn" type="button" aria-label="Ayuda: tema o bloque">?</button>
-                  <span class="help-popover" role="tooltip">Es la unidad concreta que quieres meter en la curva de repasos.</span>
-                </span>
-              </div>
-              <input id="topicInput" name="topic" required placeholder="Tema 4. Acto administrativo" />
-            </div>
-            <div class="field-group">
-              <div class="field-label-row">
-                <label class="field-label" for="dateInput">📅 Fecha de estudio</label>
-                <span class="help-wrap">
-                  <button class="help-btn" type="button" aria-label="Ayuda: fecha de estudio">?</button>
-                  <span class="help-popover" role="tooltip">La app programa el primer repaso 24 horas después de esta fecha.</span>
-                </span>
-              </div>
-              <input id="dateInput" name="firstDate" type="date" required />
-            </div>
-            <button class="primary" type="submit">➕ Crear plan</button>
-          </form>
-
-          <div class="curve-box">
-            <h3 class="label-row">
-              🧠 Secuencia
+            <div class="panel-title-row">
+              <h2>➕ Nuevo temario</h2>
               <span class="help-wrap">
-                <button class="help-btn" type="button" aria-label="Ayuda: secuencia">?</button>
-                <span class="help-popover" role="tooltip">Es el plan base. Luego se acerca o se separa según la nota de cada repaso.</span>
+                <button class="help-btn" type="button" aria-label="Ayuda: nuevo temario">?</button>
+                <span class="help-popover" role="tooltip">Crea un plan de repasos desde la fecha en la que se estudió ese tema.</span>
               </span>
-            </h3>
-            <div class="chips" id="curveChips"></div>
+            </div>
+            <button class="ghost panel-toggle" id="topicPanelToggle" type="button" aria-controls="topicPanelBody" aria-expanded="true">Ocultar</button>
+          </div>
+          <div id="topicPanelBody" class="topic-panel-body">
+            <form id="topicForm" class="stack">
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label class="field-label" for="subjectInput">🎓 Asignatura/Oposición</label>
+                  <span class="help-wrap">
+                    <button class="help-btn" type="button" aria-label="Ayuda: asignatura u oposición">?</button>
+                    <span class="help-popover" role="tooltip">Puedes poner una asignatura, una oposición o un bloque general de estudio.</span>
+                  </span>
+                </div>
+                <input id="subjectInput" name="subject" list="subjectOptions" required placeholder="Administrativo del Estado" />
+                <datalist id="subjectOptions"></datalist>
+              </div>
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label class="field-label" for="topicInput">📘 Tema o bloque</label>
+                  <span class="help-wrap">
+                    <button class="help-btn" type="button" aria-label="Ayuda: tema o bloque">?</button>
+                    <span class="help-popover" role="tooltip">Es la unidad concreta que quieres meter en la curva de repasos.</span>
+                  </span>
+                </div>
+                <input id="topicInput" name="topic" required placeholder="Tema 4. Acto administrativo" />
+              </div>
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label class="field-label" for="dateInput">📅 Fecha de estudio</label>
+                  <span class="help-wrap">
+                    <button class="help-btn" type="button" aria-label="Ayuda: fecha de estudio">?</button>
+                    <span class="help-popover" role="tooltip">La app programa el primer repaso 24 horas después de esta fecha.</span>
+                  </span>
+                </div>
+                <input id="dateInput" name="firstDate" type="date" required />
+              </div>
+              <button class="primary" type="submit">➕ Crear plan</button>
+            </form>
+
+            <div class="curve-box">
+              <h3 class="label-row">
+                🧠 Secuencia
+                <span class="help-wrap">
+                  <button class="help-btn" type="button" aria-label="Ayuda: secuencia">?</button>
+                  <span class="help-popover" role="tooltip">Es el plan base. Luego se acerca o se separa según la nota de cada repaso.</span>
+                </span>
+              </h3>
+              <div class="chips" id="curveChips"></div>
+            </div>
           </div>
         </aside>
       </section>

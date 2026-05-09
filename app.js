@@ -8,6 +8,7 @@ const ivyDifficulties = {
   red: { label: "Difícil", emoji: "🔴", className: "red", multiplier: 1.5, weight: 3 },
 };
 const storageKey = "spaced-bambutition-state-v1";
+const topicPanelStateKey = "spaced-bambutition-topic-panel-collapsed";
 const legacyStorageKeys = ["repaso10-state-v7"];
 const skipProfile = { label: "Rescate", factor: 0.5, easeDelta: -0.14, masteryDelta: -6 };
 const scoreProfiles = [
@@ -43,6 +44,9 @@ const els = {
   rewardPoints: document.querySelector("#rewardPoints"),
   rewardList: document.querySelector("#rewardList"),
   curveChips: document.querySelector("#curveChips"),
+  topicPanel: document.querySelector("#topicPanel"),
+  topicPanelBody: document.querySelector("#topicPanelBody"),
+  topicPanelToggle: document.querySelector("#topicPanelToggle"),
   topicForm: document.querySelector("#topicForm"),
   subjectOptions: document.querySelector("#subjectOptions"),
   rewardForm: document.querySelector("#rewardForm"),
@@ -89,6 +93,7 @@ els.topicForm.addEventListener("submit", (event) => {
   saveState();
   els.topicForm.reset();
   document.querySelector("#dateInput").valueAsDate = new Date();
+  setTopicPanelCollapsed(true);
   render();
 });
 
@@ -141,6 +146,10 @@ els.ivyForm.addEventListener("submit", (event) => {
   addIvyTask();
 });
 
+els.topicPanelToggle.addEventListener("click", () => {
+  setTopicPanelCollapsed(!els.topicPanel.classList.contains("is-collapsed"));
+});
+
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;
@@ -163,6 +172,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
 setInterval(() => notifyDueReviews(false), 60_000);
 registerServiceWorker();
 cleanupOldCompletedIvyTasks();
+setTopicPanelCollapsed(localStorage.getItem(topicPanelStateKey) === "true");
 render();
 
 function registerServiceWorker() {
@@ -196,6 +206,14 @@ function loadState() {
   } catch {
     return normalizeState({});
   }
+}
+
+function setTopicPanelCollapsed(isCollapsed) {
+  els.topicPanel.classList.toggle("is-collapsed", isCollapsed);
+  els.topicPanelBody.hidden = isCollapsed;
+  els.topicPanelToggle.textContent = isCollapsed ? "Mostrar" : "Ocultar";
+  els.topicPanelToggle.setAttribute("aria-expanded", String(!isCollapsed));
+  localStorage.setItem(topicPanelStateKey, String(isCollapsed));
 }
 
 function normalizeState(raw) {
