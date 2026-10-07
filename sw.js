@@ -1,4 +1,4 @@
-const cacheName = "spaced-bambutition-v6";
+const cacheName = "spaced-bambutition-v7";
 const appShell = [
   "./",
   "./index.html",

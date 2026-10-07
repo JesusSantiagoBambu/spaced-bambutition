@@ -37,6 +37,7 @@ Cuando cambies archivos cacheados, sube tambien la version de `cacheName` en `sw
 - Accion de repaso saltado: resta pocos puntos, mueve el repaso a recuperacion y recalcula los siguientes.
 - Equilibrado de carga diaria para evitar mas de 3 repasos en el mismo dia.
 - Metodo Ivy Lee en la vista de hoy: hasta 6 tareas diarias con pomodoros y puntos al completarlas.
+- Duracion configurable por pomodoro: 25, 30, 35 o 50 minutos.
 - Dificultad tipo semaforo para cada tarea Ivy Lee: verde, amarillo o rojo.
 - Estadisticas visuales de pomodoros de hoy, ultimos 7 dias y dias cumplidos.
 - Las tareas Ivy Lee completadas desaparecen automaticamente al cambiar de dia, manteniendo sus puntos y estadisticas.
@@ -45,8 +46,9 @@ Cuando cambies archivos cacheados, sube tambien la version de `cacheName` en `sw
 - Racha diaria y niveles por puntos acumulados.
 - Recompensas configurables por el propio estudiante.
 - Notificaciones del navegador mientras la app esta abierta y el permiso esta activo.
+- Copias de seguridad en JSON para exportar e importar los datos del alumno.
 - PWA instalable en movil/tablet cuando se publica en HTTPS, con icono y cache offline basico.
-- Color principal de marca `#09A5BC` y tipografia Poppins con fallback de sistema.
+- Look pixel-art inspirado en consolas clasicas, manteniendo el color principal de marca `#09A5BC`.
 - Ayudas contextuales con botones `?` para explicar cada bloque importante.
 - Borrado de temarios desde la vista de progreso cuando se han creado por error.
 - Pantalla ordenada con los repasos de hoy como primer bloque util en movil y tablet.

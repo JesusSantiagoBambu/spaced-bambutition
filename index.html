@@ -13,7 +13,7 @@
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -26,6 +26,13 @@
         <button class="icon-btn" id="notifyBtn" title="Activar notificaciones" aria-label="Activar notificaciones">
           <span aria-hidden="true">🔔</span>
         </button>
+        <button class="icon-btn" id="exportBtn" title="Exportar copia de seguridad" aria-label="Exportar copia de seguridad" type="button">
+          <span aria-hidden="true">💾</span>
+        </button>
+        <button class="icon-btn" id="importBtn" title="Importar copia de seguridad" aria-label="Importar copia de seguridad" type="button">
+          <span aria-hidden="true">📥</span>
+        </button>
+        <input id="importFileInput" type="file" accept="application/json,.json" hidden />
         <span class="install-wrap" id="installWrap">
           <button class="icon-btn" id="installBtn" title="Cómo instalar la app" aria-label="Cómo instalar la app" aria-expanded="false" aria-controls="installHelp" type="button">
             <span aria-hidden="true">📲</span>
@@ -77,6 +84,12 @@
               <form id="ivyForm" class="ivy-form">
                 <input id="ivyTaskInput" required maxlength="90" placeholder="Tarea prioritaria de hoy" />
                 <input id="ivyPomodoroInput" required type="number" min="1" max="8" value="1" aria-label="Pomodoros" />
+                <select id="ivyDurationInput" aria-label="Minutos por pomodoro">
+                  <option value="25" selected>25 min</option>
+                  <option value="30">30 min</option>
+                  <option value="35">35 min</option>
+                  <option value="50">50 min</option>
+                </select>
                 <select id="ivyDifficultyInput" aria-label="Dificultad">
                   <option value="green">🟢 Fácil</option>
                   <option value="yellow" selected>🟡 Media</option>

@@ -2,12 +2,14 @@ const curveDays = [1, 3, 7, 14, 30, 60, 120];
 const dailyReviewLimit = 3;
 const ivyTaskLimit = 6;
 const ivyPointsPerPomodoro = 5;
+const pomodoroDurations = [25, 30, 35, 50];
 const ivyDifficulties = {
   green: { label: "Fácil", emoji: "🟢", className: "green", multiplier: 1, weight: 1 },
   yellow: { label: "Media", emoji: "🟡", className: "yellow", multiplier: 1.2, weight: 2 },
   red: { label: "Difícil", emoji: "🔴", className: "red", multiplier: 1.5, weight: 3 },
 };
 const storageKey = "spaced-bambutition-state-v1";
+const backupVersion = 1;
 const topicPanelStateKey = "spaced-bambutition-topic-panel-collapsed";
 const legacyStorageKeys = ["repaso10-state-v7"];
 const skipProfile = { label: "Rescate", factor: 0.5, easeDelta: -0.14, masteryDelta: -6 };
@@ -36,6 +38,7 @@ const els = {
   ivyForm: document.querySelector("#ivyForm"),
   ivyTaskInput: document.querySelector("#ivyTaskInput"),
   ivyPomodoroInput: document.querySelector("#ivyPomodoroInput"),
+  ivyDurationInput: document.querySelector("#ivyDurationInput"),
   ivyDifficultyInput: document.querySelector("#ivyDifficultyInput"),
   ivyList: document.querySelector("#ivyList"),
   calendarList: document.querySelector("#calendarList"),
@@ -59,6 +62,9 @@ const els = {
   noteInput: document.querySelector("#noteInput"),
   closeReview: document.querySelector("#closeReview"),
   notifyBtn: document.querySelector("#notifyBtn"),
+  exportBtn: document.querySelector("#exportBtn"),
+  importBtn: document.querySelector("#importBtn"),
+  importFileInput: document.querySelector("#importFileInput"),
   installWrap: document.querySelector("#installWrap"),
   installBtn: document.querySelector("#installBtn"),
   installHelp: document.querySelector("#installHelp"),
@@ -136,6 +142,14 @@ els.notifyBtn.addEventListener("click", async () => {
     notifyDueReviews(true);
   }
 });
+
+els.exportBtn.addEventListener("click", exportBackup);
+
+els.importBtn.addEventListener("click", () => {
+  els.importFileInput.click();
+});
+
+els.importFileInput.addEventListener("change", importBackup);
 
 els.installBtn.addEventListener("click", (event) => {
   event.preventDefault();
@@ -319,6 +333,57 @@ function renderInstallHelp() {
   els.installNowBtn.hidden = !deferredInstallPrompt || Boolean(isStandalone);
 }
 
+function exportBackup() {
+  const backup = {
+    app: "Spaced Bambutition",
+    version: backupVersion,
+    exportedAt: new Date().toISOString(),
+    state,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `spaced-bambutition-backup-${dateKey(new Date())}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function importBackup(event) {
+  const [file] = event.target.files || [];
+  event.target.value = "";
+  if (!file) return;
+
+  try {
+    const parsed = JSON.parse(await file.text());
+    const importedState = parsed?.state && typeof parsed.state === "object" ? parsed.state : parsed;
+    if (!looksLikeBackupState(importedState)) {
+      alert("No parece una copia de seguridad válida de Spaced Bambutition.");
+      return;
+    }
+    const confirmed = confirm("Importar esta copia sustituirá los datos actuales de esta app en este dispositivo. ¿Continuar?");
+    if (!confirmed) return;
+
+    replaceState(normalizeState(importedState));
+    saveState();
+    cleanupOldCompletedIvyTasks();
+    render();
+    alert("Copia importada correctamente.");
+  } catch {
+    alert("No se ha podido leer el archivo. Comprueba que sea un JSON válido.");
+  }
+}
+
+function looksLikeBackupState(value) {
+  if (!value || typeof value !== "object") return false;
+  return ["topics", "rewards", "history", "ivyTasks", "subjects", "points"].some((key) => key in value);
+}
+
+function replaceState(nextState) {
+  Object.keys(state).forEach((key) => delete state[key]);
+  Object.assign(state, nextState);
+}
+
 function normalizeState(raw) {
   const topics = Array.isArray(raw.topics) ? raw.topics.map(normalizeTopic) : [];
   return {
@@ -384,15 +449,22 @@ function makeInitialRewards() {
 
 function normalizeIvyTask(task) {
   const difficulty = ivyDifficulties[task.difficulty] ? task.difficulty : "yellow";
+  const durationMinutes = normalizePomodoroDuration(task.durationMinutes);
   return {
     id: task.id || crypto.randomUUID(),
     date: task.date || dateKey(new Date()),
     title: String(task.title || "Tarea sin titulo").trim(),
     pomodoros: clamp(Number(task.pomodoros) || 1, 1, 8),
+    durationMinutes,
     difficulty,
     completedAt: task.completedAt || "",
     points: Number(task.points) || 0,
   };
+}
+
+function normalizePomodoroDuration(value) {
+  const duration = Number(value) || 25;
+  return pomodoroDurations.includes(duration) ? duration : 25;
 }
 
 function saveState() {
@@ -747,8 +819,8 @@ function todayIvyTasks() {
       const difficultyOrder = ivyDifficultyWeight(b) - ivyDifficultyWeight(a);
       if (difficultyOrder !== 0) return difficultyOrder;
 
-      const pomodoroOrder = b.pomodoros - a.pomodoros;
-      if (pomodoroOrder !== 0) return pomodoroOrder;
+      const timeOrder = ivyTaskMinutes(b) - ivyTaskMinutes(a);
+      if (timeOrder !== 0) return timeOrder;
 
       return a.title.localeCompare(b.title, "es", { sensitivity: "base" });
     });
@@ -767,6 +839,7 @@ function addIvyTask() {
 
   const title = els.ivyTaskInput.value.trim();
   const pomodoros = clamp(Number(els.ivyPomodoroInput.value) || 1, 1, 8);
+  const durationMinutes = normalizePomodoroDuration(els.ivyDurationInput.value);
   const difficulty = ivyDifficulties[els.ivyDifficultyInput.value] ? els.ivyDifficultyInput.value : "yellow";
   if (!title) return;
 
@@ -775,6 +848,7 @@ function addIvyTask() {
     date: dateKey(new Date()),
     title,
     pomodoros,
+    durationMinutes,
     difficulty,
     completedAt: "",
     points: 0,
@@ -782,6 +856,7 @@ function addIvyTask() {
   saveState();
   els.ivyForm.reset();
   els.ivyPomodoroInput.value = 1;
+  els.ivyDurationInput.value = "25";
   els.ivyDifficultyInput.value = "yellow";
   render();
 }
@@ -801,6 +876,7 @@ function completeIvyTask(taskId) {
     taskId: task.id,
     task: task.title,
     pomodoros: task.pomodoros,
+    durationMinutes: task.durationMinutes,
     difficulty: task.difficulty || "yellow",
     points,
     completedAt: completedAt.toISOString(),
@@ -829,6 +905,10 @@ function ivyTaskPoints(task) {
   return Math.round(task.pomodoros * ivyPointsPerPomodoro * difficulty.multiplier);
 }
 
+function ivyTaskMinutes(task) {
+  return task.pomodoros * normalizePomodoroDuration(task.durationMinutes);
+}
+
 function ivyPomodoroStats() {
   const today = dateKey(new Date());
   const weekStart = dateKey(addDays(new Date(), -6));
@@ -838,22 +918,38 @@ function ivyPomodoroStats() {
   const todayCompleted = completedIvy
     .filter((item) => dateKey(item.completedAt) === today)
     .reduce((sum, item) => sum + (Number(item.pomodoros) || 0), 0);
+  const todayMinutesCompleted = completedIvy
+    .filter((item) => dateKey(item.completedAt) === today)
+    .reduce((sum, item) => sum + ((Number(item.pomodoros) || 0) * normalizePomodoroDuration(item.durationMinutes)), 0);
   const todayPending = state.ivyTasks
     .filter((task) => task.date === today && !task.completedAt)
     .reduce((sum, task) => sum + task.pomodoros, 0);
+  const todayMinutesPending = state.ivyTasks
+    .filter((task) => task.date === today && !task.completedAt)
+    .reduce((sum, task) => sum + ivyTaskMinutes(task), 0);
   const weekCompleted = completedIvy
     .filter((item) => isInRange(dateKey(item.completedAt)))
     .reduce((sum, item) => sum + (Number(item.pomodoros) || 0), 0);
+  const weekMinutesCompleted = completedIvy
+    .filter((item) => isInRange(dateKey(item.completedAt)))
+    .reduce((sum, item) => sum + ((Number(item.pomodoros) || 0) * normalizePomodoroDuration(item.durationMinutes)), 0);
   const weekPending = state.ivyTasks
     .filter((task) => isInRange(task.date) && !task.completedAt)
     .reduce((sum, task) => sum + task.pomodoros, 0);
+  const weekMinutesPending = state.ivyTasks
+    .filter((task) => isInRange(task.date) && !task.completedAt)
+    .reduce((sum, task) => sum + ivyTaskMinutes(task), 0);
   const weekDays = new Set(completedIvy.filter((item) => isInRange(dateKey(item.completedAt))).map((item) => dateKey(item.completedAt))).size;
 
   return {
     todayCompleted,
     todayPlanned: todayCompleted + todayPending,
+    todayMinutesCompleted,
+    todayMinutesPlanned: todayMinutesCompleted + todayMinutesPending,
     weekCompleted,
     weekPlanned: weekCompleted + weekPending,
+    weekMinutesCompleted,
+    weekMinutesPlanned: weekMinutesCompleted + weekMinutesPending,
     weekDays,
   };
 }
@@ -928,7 +1024,7 @@ function renderIvyTasks(tasks) {
         <p class="card-title">${task.completedAt ? "✅" : "🍅"} ${escapeHtml(task.title)}</p>
         <p class="card-meta">
           <span class="difficulty-pill ${difficulty.className}">${difficulty.emoji} ${difficulty.label}</span>
-          ${task.pomodoros} ${task.pomodoros === 1 ? "pomodoro" : "pomodoros"} · ${ivyTaskPoints(task)} puntos
+          ${task.pomodoros} ${task.pomodoros === 1 ? "pomodoro" : "pomodoros"} de ${normalizePomodoroDuration(task.durationMinutes)} min · ${ivyTaskMinutes(task)} min · ${ivyTaskPoints(task)} puntos
         </p>
       </div>
       <div class="ivy-actions">
@@ -952,11 +1048,13 @@ function renderIvyStats(stats) {
     <article class="ivy-stat-card">
       <span>Hoy</span>
       <strong>${stats.todayCompleted}/${stats.todayPlanned}</strong>
+      <small>${stats.todayMinutesCompleted}/${stats.todayMinutesPlanned} min</small>
       <div class="mini-progress" aria-hidden="true"><span style="width: ${todayPercent}%"></span></div>
     </article>
     <article class="ivy-stat-card">
       <span>7 días</span>
       <strong>${stats.weekCompleted}/${stats.weekPlanned}</strong>
+      <small>${stats.weekMinutesCompleted}/${stats.weekMinutesPlanned} min</small>
       <div class="mini-progress" aria-hidden="true"><span style="width: ${weekPercent}%"></span></div>
     </article>
     <article class="ivy-stat-card">
