@@ -41,14 +41,17 @@ Cuando cambies archivos cacheados, sube tambien la version de `cacheName` en `sw
 - Accion de repaso saltado: resta pocos puntos y mueve el repaso a recuperacion al dia siguiente.
 - Carga diaria elegible por el alumno (1 a 5 repasos, por defecto 3). El equilibrado solo mueve cada repaso unos dias (alrededor del 10% de su intervalo) para no romper la curva; los repasos de 1-2 dias nunca se mueven.
 - Migracion automatica de los datos de la version anterior: el proximo repaso de cada tema conserva su fecha; los temas que antes se daban por completados vuelven al ciclo repartidos segun la carga diaria.
-- Metodo Ivy Lee en la vista de hoy: hasta 6 tareas diarias con pomodoros y puntos al completarlas.
+- Metodo Ivy Lee en la vista de hoy: hasta 6 tareas diarias con bloques (pomodoros) y puntos al completarlas.
 - Duracion configurable por pomodoro: 25, 30, 35 o 50 minutos.
 - Dificultad tipo semaforo para cada tarea Ivy Lee: verde, amarillo o rojo.
 - Estadisticas visuales de pomodoros de hoy, ultimos 7 dias y dias cumplidos.
 - Las tareas Ivy Lee completadas desaparecen automaticamente al cambiar de dia, manteniendo sus puntos y estadisticas.
-- Registro de nota por repaso, comentario opcional y media por tema.
+- Registro de nota por repaso, comentario opcional y media por tema. Al evaluar se muestran los ultimos comentarios de ese tema.
+- Progreso con grafica de nota media semanal y ficha de cada tema con su grafica de notas y todos sus comentarios.
+- Calendario agrupado por dia con los repasos programados y los siguientes estimados (suponiendo un 7) dentro de los proximos 30 dias.
+- Temas en modo hardcore marcados en rojo con 🔥.
 - Puntos por completar repasos, bonus por buena nota y bonus por puntualidad.
-- Racha diaria (vuelve a 0 si pasa un dia sin repasar) y niveles por puntos acumulados.
+- Racha diaria (vuelve a 0 si pasa un dia sin repasar) y niveles cada 250 puntos ganados (el nivel no baja al canjear recompensas).
 - Recompensas configurables por el propio estudiante.
 - Notificaciones del navegador mientras la app esta abierta y el permiso esta activo.
 - Copias de seguridad en JSON para exportar e importar los datos del alumno.

@@ -3,7 +3,6 @@ const appShell = [
   "./",
   "./index.html",
   "./styles.css",
-  "./sprites.js",
   "./app.js",
   "./app.webmanifest",
   "./icons/icon.svg",

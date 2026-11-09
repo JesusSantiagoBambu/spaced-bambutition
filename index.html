@@ -44,64 +44,56 @@
     </header>
 
     <main class="app-shell">
-      <section class="hero-card" aria-label="Tu personaje">
-        <div class="hero-stage">
-          <div class="hero-sprite" id="heroSprite"></div>
-          <span class="hero-ground" aria-hidden="true"></span>
-        </div>
-        <div class="hero-info">
-          <p class="hero-class" id="heroClass">Aprendiz en taparrabos</p>
-          <p class="hero-level">
-            Nivel <strong id="levelStat">1</strong>
+      <section class="summary-band" aria-label="Resumen">
+        <div class="stat">
+          <span class="stat-label label-row">
+            ⭐ Puntos
             <span class="help-wrap">
-              <button class="help-btn" type="button" aria-label="Ayuda: nivel y personaje">?</button>
-              <span class="help-popover" role="tooltip">Subes de nivel cada 250 puntos de experiencia (XP). La XP es todo lo que has ganado y nunca baja, aunque gastes puntos en recompensas. Cada dos niveles tu personaje consigue equipo nuevo.</span>
+              <button class="help-btn" type="button" aria-label="Ayuda: puntos">?</button>
+              <span class="help-popover" role="tooltip">Suben al completar repasos y tareas, y bajan si saltas repasos. Se gastan en recompensas.</span>
             </span>
-          </p>
-          <div class="xp-bar" aria-hidden="true"><span id="xpFill"></span></div>
-          <p class="hero-next" id="xpText">0 / 250 XP</p>
+          </span>
+          <strong id="pointsStat">0</strong>
         </div>
-        <div class="hero-stats">
-          <div class="stat">
-            <span class="stat-label label-row">
-              ⭐ Puntos
-              <span class="help-wrap">
-                <button class="help-btn" type="button" aria-label="Ayuda: puntos">?</button>
-                <span class="help-popover" role="tooltip">Suben al completar repasos, tareas y monstruos, y bajan si saltas repasos. Se gastan en recompensas.</span>
-              </span>
+        <div class="stat">
+          <span class="stat-label label-row">
+            🔥 Racha
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: racha">?</button>
+              <span class="help-popover" role="tooltip">Días seguidos completando al menos un repaso. Si pasa un día entero sin repasar, vuelve a 0.</span>
             </span>
-            <strong id="pointsStat">0</strong>
-          </div>
-          <div class="stat">
-            <span class="stat-label label-row">
-              🔥 Racha
-              <span class="help-wrap">
-                <button class="help-btn" type="button" aria-label="Ayuda: racha">?</button>
-                <span class="help-popover" role="tooltip">Días seguidos completando al menos un repaso. Si pasa un día entero sin repasar, vuelve a 0.</span>
-              </span>
+          </span>
+          <strong id="streakStat">0 días</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label label-row">
+            🏆 Nivel
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: nivel">?</button>
+              <span class="help-popover" role="tooltip">Sube cada 250 puntos ganados. Cuenta todo lo que has ganado, así que no baja aunque gastes puntos en recompensas.</span>
             </span>
-            <strong id="streakStat">0 días</strong>
-          </div>
-          <div class="stat">
-            <span class="stat-label label-row">
-              ✅ Hoy
-              <span class="help-wrap">
-                <button class="help-btn" type="button" aria-label="Ayuda: hoy">?</button>
-                <span class="help-popover" role="tooltip">Repasos que toca resolver hoy o que están atrasados.</span>
-              </span>
+          </span>
+          <strong id="levelStat">1</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label label-row">
+            ✅ Hoy
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: hoy">?</button>
+              <span class="help-popover" role="tooltip">Repasos que toca resolver hoy o que están atrasados.</span>
             </span>
-            <strong id="todayStat">0 repasos</strong>
-          </div>
-          <div class="stat">
-            <span class="stat-label label-row">
-              ⚖️ Carga
-              <span class="help-wrap">
-                <button class="help-btn" type="button" aria-label="Ayuda: carga">?</button>
-                <span class="help-popover" role="tooltip">Repasos programados hoy sobre tu máximo diario. Elige de 1 a 5 (recomendado: 3). La app reparte los repasos futuros moviéndolos solo unos días para no romper la curva, así que algún día puede pasarse un poco.</span>
-              </span>
+          </span>
+          <strong id="todayStat">0 repasos</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label label-row">
+            ⚖️ Carga
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: carga">?</button>
+              <span class="help-popover" role="tooltip">Repasos programados hoy sobre tu máximo diario. Elige de 1 a 5 (recomendado: 3). La app reparte los repasos futuros moviéndolos solo unos días para no romper la curva, así que algún día puede pasarse un poco.</span>
             </span>
-            <strong class="load-value"><span id="loadStat">0/</span><select id="dailyLimitSelect" aria-label="Máximo de repasos al día"></select></strong>
-          </div>
+          </span>
+          <strong class="load-value"><span id="loadStat">0/</span><select id="dailyLimitSelect" aria-label="Máximo de repasos al día"></select></strong>
         </div>
       </section>
 
@@ -141,7 +133,7 @@
               <div id="ivyStats" class="ivy-stats" aria-label="Estadísticas de pomodoros"></div>
               <form id="ivyForm" class="ivy-form">
                 <input id="ivyTaskInput" required maxlength="90" placeholder="Tarea prioritaria de hoy" />
-                <input id="ivyPomodoroInput" required type="number" min="1" max="8" value="1" aria-label="Pomodoros" />
+                <select id="ivyPomodoroInput" aria-label="Bloques"><option value="1" selected>1 bloque</option><option value="2">2 bloques</option><option value="3">3 bloques</option><option value="4">4 bloques</option><option value="5">5 bloques</option><option value="6">6 bloques</option><option value="7">7 bloques</option><option value="8">8 bloques</option></select>
                 <select id="ivyDurationInput" aria-label="Minutos por pomodoro">
                   <option value="25" selected>25 min</option>
                   <option value="30">30 min</option>
@@ -158,19 +150,6 @@
               <div id="ivyList" class="ivy-list"></div>
             </section>
 
-            <section class="battle-section" aria-labelledby="battleTitle">
-              <div class="section-title">
-                <h2 id="battleTitle" class="label-row">
-                  ⚔️ Monstruo del día
-                  <span class="help-wrap">
-                    <button class="help-btn" type="button" aria-label="Ayuda: monstruo del día">?</button>
-                    <span class="help-popover" role="tooltip">Cada día aparece un monstruo. Es más fuerte cuantos más repasos, tareas y temas flojos tengas. Cada repaso o tarea Ivy Lee que completes hoy es un golpe. Si saltas un repaso, se cura y ese día escapa. Si lo derrotas, ganas puntos extra.</span>
-                  </span>
-                </h2>
-                <span id="battleStatus" class="count-pill">—</span>
-              </div>
-              <div id="battleArena" class="battle-arena"></div>
-            </section>
           </div>
 
           <div id="calendarView" class="view">
@@ -303,7 +282,6 @@
       </div>
     </template>
 
-    <script src="sprites.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

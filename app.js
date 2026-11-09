@@ -19,7 +19,6 @@ const srsConfig = {
 };
 const ivyTaskLimit = 6;
 const xpPerLevel = 250;
-const seenTierKey = "spaced-bambutition-seen-tier";
 const ivyPointsPerPomodoro = 5;
 const pomodoroDurations = [25, 30, 35, 50];
 const ivyDifficulties = {
@@ -43,7 +42,6 @@ const state = loadState();
 let activeReviewId = null;
 let lastNotificationKey = "";
 let deferredInstallPrompt = null;
-let renderedHeroTier = null;
 
 const els = {
   pointsStat: document.querySelector("#pointsStat"),
@@ -90,12 +88,6 @@ const els = {
   installDeviceText: document.querySelector("#installDeviceText"),
   installNowBtn: document.querySelector("#installNowBtn"),
   dailyLimitSelect: document.querySelector("#dailyLimitSelect"),
-  heroSprite: document.querySelector("#heroSprite"),
-  heroClass: document.querySelector("#heroClass"),
-  xpFill: document.querySelector("#xpFill"),
-  xpText: document.querySelector("#xpText"),
-  battleArena: document.querySelector("#battleArena"),
-  battleStatus: document.querySelector("#battleStatus"),
   calendarCount: document.querySelector("#calendarCount"),
   overallChart: document.querySelector("#overallChart"),
   reviewPastNotes: document.querySelector("#reviewPastNotes"),
@@ -457,7 +449,6 @@ function normalizeState(raw) {
     rewards: Array.isArray(raw.rewards) && raw.rewards.length ? raw.rewards : makeInitialRewards(),
     ivyTasks: Array.isArray(raw.ivyTasks) ? raw.ivyTasks.map(normalizeIvyTask) : [],
     history: Array.isArray(raw.history) ? raw.history : [],
-    battle: raw.battle && typeof raw.battle === "object" ? raw.battle : null,
   };
 }
 
@@ -982,7 +973,6 @@ function recomputePointsFromHistory() {
   const earned = state.history.reduce((sum, item) => {
     if (item.type === "completed") return sum + (Number(item.points) || 0);
     if (item.type === "ivy") return sum + (Number(item.points) || 0);
-    if (item.type === "monster") return sum + (Number(item.points) || 0);
     if (item.type === "skipped") return sum - (Number(item.penalty) || 0);
     return sum;
   }, 0);
@@ -1262,8 +1252,6 @@ function render() {
     : 0;
   const todayLoad = countReviewsOn(new Date());
 
-  const battle = updateBattle();
-
   els.pointsStat.textContent = state.points;
   const streak = currentStreak();
   els.streakStat.textContent = `${streak} ${streak === 1 ? "día" : "días"}`;
@@ -1275,12 +1263,11 @@ function render() {
   els.averageScore.textContent = completed.length ? `Media ${formatScore(average)}` : "Sin notas";
   els.rewardPoints.textContent = `${state.points} puntos`;
 
-  renderHero();
+  els.levelStat.textContent = Math.floor(lifetimeXp() / xpPerLevel) + 1;
   renderSubjectOptions();
   renderDueList(due);
   renderIvyStats(ivyPomodoroStats());
   renderIvyTasks(ivyTasks);
-  renderBattle(battle);
   renderCalendar();
   renderProgress();
   renderRewards();
@@ -1328,7 +1315,7 @@ function renderIvyTasks(tasks) {
         <p class="card-title">${task.completedAt ? "✅" : "🍅"} ${escapeHtml(task.title)}</p>
         <p class="card-meta">
           <span class="difficulty-pill ${difficulty.className}">${difficulty.emoji} ${difficulty.label}</span>
-          ${task.pomodoros} ${task.pomodoros === 1 ? "pomodoro" : "pomodoros"} de ${normalizePomodoroDuration(task.durationMinutes)} min · ${ivyTaskMinutes(task)} min · ${ivyTaskPoints(task)} puntos
+          ${task.pomodoros} ${task.pomodoros === 1 ? "bloque" : "bloques"} de ${normalizePomodoroDuration(task.durationMinutes)} min · ${ivyTaskMinutes(task)} min · ${ivyTaskPoints(task)} puntos
         </p>
       </div>
       <div class="ivy-actions">
@@ -1350,13 +1337,13 @@ function renderIvyStats(stats) {
   const weekPercent = stats.weekPlanned ? Math.round((stats.weekCompleted / stats.weekPlanned) * 100) : 0;
   els.ivyStats.innerHTML = `
     <article class="ivy-stat-card">
-      <span>Hoy</span>
+      <span>Bloques hoy</span>
       <strong>${stats.todayCompleted}/${stats.todayPlanned}</strong>
       <small>${stats.todayMinutesCompleted}/${stats.todayMinutesPlanned} min</small>
       <div class="mini-progress" aria-hidden="true"><span style="width: ${todayPercent}%"></span></div>
     </article>
     <article class="ivy-stat-card">
-      <span>7 días</span>
+      <span>Bloques en 7 días</span>
       <strong>${stats.weekCompleted}/${stats.weekPlanned}</strong>
       <small>${stats.weekMinutesCompleted}/${stats.weekMinutesPlanned} min</small>
       <div class="mini-progress" aria-hidden="true"><span style="width: ${weekPercent}%"></span></div>
@@ -1400,185 +1387,16 @@ function relativeDayLabel(date) {
   return new Intl.DateTimeFormat("es", { weekday: "long" }).format(date).replace(/^./, (c) => c.toUpperCase());
 }
 
-// ---------- Heroe y experiencia ----------
+// ---------- Nivel ----------
 
-
+// Puntos ganados en total (sin restar recompensas), para que el nivel nunca baje.
 function lifetimeXp() {
   const earned = state.history.reduce((sum, item) => {
-    if (item.type === "completed" || item.type === "ivy" || item.type === "monster") return sum + (Number(item.points) || 0);
+    if (item.type === "completed" || item.type === "ivy") return sum + (Number(item.points) || 0);
     if (item.type === "skipped") return sum - (Number(item.penalty) || 0);
     return sum;
   }, 0);
   return Math.max(0, earned, state.points);
-}
-
-function levelInfo() {
-  const tiers = window.BambuSprites.heroTiers;
-  const xp = lifetimeXp();
-  const level = Math.floor(xp / xpPerLevel) + 1;
-  const tier = Math.min(tiers.length - 1, Math.floor((level - 1) / 2));
-  const nextTierLevel = tier < tiers.length - 1 ? (tier + 1) * 2 + 1 : null;
-  return { xp, level, tier, into: xp % xpPerLevel, nextTierLevel, tiers };
-}
-
-
-function renderHero() {
-  const info = levelInfo();
-  els.levelStat.textContent = info.level;
-  els.heroClass.textContent = info.tiers[info.tier].name;
-  els.xpFill.style.width = `${Math.round((info.into / xpPerLevel) * 100)}%`;
-  const next = info.nextTierLevel
-    ? `Nivel ${info.nextTierLevel}: ${info.tiers[info.tier + 1].name.toLowerCase()}`
-    : "Equipo legendario completo";
-  els.xpText.textContent = `${info.into}/${xpPerLevel} XP para el nivel ${info.level + 1} · ${next}`;
-
-  if (renderedHeroTier !== info.tier) {
-    els.heroSprite.innerHTML = window.BambuSprites.heroSVG(info.tier);
-    renderedHeroTier = info.tier;
-  }
-
-  let seen = null;
-  try { seen = localStorage.getItem(seenTierKey); } catch {}
-  if (seen === null) {
-    try { localStorage.setItem(seenTierKey, String(info.tier)); } catch {}
-  } else if (info.tier > Number(seen)) {
-    try { localStorage.setItem(seenTierKey, String(info.tier)); } catch {}
-    els.heroSprite.classList.remove("level-up");
-    void els.heroSprite.offsetWidth;
-    els.heroSprite.classList.add("level-up");
-    showToast(`¡Nuevo equipo! Ahora eres: ${info.tiers[info.tier].name}`);
-  }
-}
-
-function showToast(message) {
-  let toast = document.querySelector(".toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.className = "toast";
-    toast.setAttribute("role", "status");
-    document.body.append(toast);
-  }
-  toast.textContent = message;
-  toast.classList.remove("show");
-  void toast.offsetWidth;
-  toast.classList.add("show");
-  clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toast.classList.remove("show"), 4200);
-}
-
-// ---------- Monstruo del dia ----------
-
-function hashString(value) {
-  return Array.from(value).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 7);
-}
-
-function monsterIndexForThreat(threat) {
-  if (threat <= 0) return -1;
-  if (threat <= 2) return 0;
-  if (threat <= 4) return 1;
-  if (threat <= 6) return 2;
-  if (threat <= 8) return 3;
-  if (threat <= 11) return 4;
-  return 5;
-}
-
-function battleSnapshot() {
-  const today = dateKey(new Date());
-  const isToday = (value) => value && dateKey(value) === today;
-  const reviewsDone = state.history.filter((item) => item.type === "completed" && isToday(item.completedAt)).length;
-  const ivyDone = state.history.filter((item) => item.type === "ivy" && isToday(item.completedAt)).length;
-  const skipped = state.history.filter((item) => item.type === "skipped" && isToday(item.skippedAt)).length;
-  const due = dueReviews();
-  const ivyPending = todayIvyTasks().filter((task) => !task.completedAt).length;
-  const overdue = due.filter((item) => new Date(item.dueDate) < startOfToday()).length;
-  const weak = state.topics.filter((topic) => {
-    const done = completedReviewsOf(topic);
-    const last = done[done.length - 1];
-    return topic.srs?.relearning || (last && last.score < 5);
-  }).length;
-  const hits = reviewsDone + ivyDone;
-  const total = hits + due.length + ivyPending + skipped;
-  return { hits, total, skipped, threat: total + weak + overdue, remaining: due.length + ivyPending };
-}
-
-function updateBattle() {
-  const snapshot = battleSnapshot();
-  const today = dateKey(new Date());
-  let changed = false;
-  if (!state.battle || state.battle.date !== today) {
-    state.battle = { date: today, monster: -1, variant: hashString(today) % 3, defeated: false, reward: 0 };
-    changed = true;
-  }
-  const battle = state.battle;
-  const index = snapshot.total > 0 ? monsterIndexForThreat(snapshot.threat) : -1;
-  if (!battle.defeated && index > battle.monster) {
-    battle.monster = index;
-    changed = true;
-  }
-  if (!battle.defeated && battle.monster >= 0 && snapshot.total > 0 && snapshot.hits >= snapshot.total && snapshot.skipped === 0) {
-    const monster = window.BambuSprites.monsters[battle.monster];
-    const reward = 10 + battle.monster * 5;
-    battle.defeated = true;
-    battle.reward = reward;
-    state.points += reward;
-    state.history.unshift({
-      id: crypto.randomUUID(),
-      type: "monster",
-      monster: `${monster.name} ${monster.variants[battle.variant % monster.variants.length].label}`,
-      points: reward,
-      completedAt: new Date().toISOString(),
-    });
-    changed = true;
-    setTimeout(() => showToast(`¡Has derrotado al ${monster.name.toLowerCase()}! +${reward} puntos`), 50);
-  }
-  if (changed) saveState();
-  return snapshot;
-}
-
-function renderBattle(snapshot) {
-  const battle = state.battle;
-  const heroTier = levelInfo().tier;
-  const heroSvg = window.BambuSprites.heroSVG(heroTier);
-
-  if (!battle || battle.monster < 0 || (!battle.defeated && snapshot.total === 0)) {
-    els.battleStatus.textContent = "Sin rival";
-    els.battleArena.innerHTML = `
-      <div class="arena-scene is-calm">
-        <div class="arena-hero">${heroSvg}</div>
-        <p class="arena-calm">Hoy no hay ningún monstruo a la vista. Añade tareas Ivy Lee o crea temas y aparecerá uno.</p>
-      </div>
-    `;
-    return;
-  }
-
-  const monster = window.BambuSprites.monsters[battle.monster];
-  const variant = monster.variants[battle.variant % monster.variants.length];
-  const hp = Math.max(0, snapshot.total - snapshot.hits);
-  const hpPercent = snapshot.total ? Math.round((hp / snapshot.total) * 100) : 0;
-  const escaped = !battle.defeated && snapshot.skipped > 0 && snapshot.remaining === 0;
-  const stateClass = battle.defeated ? "is-defeated" : escaped ? "is-escaped" : "";
-  let message;
-  if (battle.defeated) message = `¡Derrotado! Has ganado ${battle.reward} puntos extra.`;
-  else if (escaped) message = "Se ha escapado: saltaste un repaso y se curó. Mañana tendrás otra oportunidad.";
-  else if (snapshot.skipped > 0) message = "Saltar un repaso lo ha curado: hoy ya no podrás derrotarlo, pero cada golpe sigue sumando.";
-  else message = `Te faltan ${hp} ${hp === 1 ? "golpe" : "golpes"}: cada repaso o tarea Ivy Lee completada hoy le quita vida. Recompensa: ${10 + battle.monster * 5} puntos.`;
-
-  els.battleStatus.textContent = battle.defeated ? "Derrotado" : escaped ? "Escapó" : `Vida ${hp}/${snapshot.total}`;
-  els.battleArena.innerHTML = `
-    <div class="arena-scene ${stateClass}">
-      <div class="arena-hero">${heroSvg}</div>
-      <span class="arena-vs" aria-hidden="true">VS</span>
-      <div class="arena-monster">${window.BambuSprites.monsterSVG(battle.monster, battle.variant)}</div>
-    </div>
-    <div class="arena-info">
-      <div class="arena-name-row">
-        <p class="monster-name">${monster.name} ${variant.label}</p>
-        <span class="monster-rank">Rango ${battle.monster + 1}/6</span>
-      </div>
-      <div class="hp-bar" role="img" aria-label="Vida del monstruo ${hp} de ${snapshot.total}"><span style="width: ${hpPercent}%"></span></div>
-      <p class="arena-message">${message}</p>
-    </div>
-  `;
 }
 
 // ---------- Calendario con repasos estimados ----------
