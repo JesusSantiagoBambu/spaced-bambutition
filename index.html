@@ -13,15 +13,12 @@
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="topbar">
-      <div>
-        <p class="eyebrow">🧠 Curva del olvido + rendimiento</p>
-        <h1>Spaced Bambutition</h1>
-      </div>
+      <h1>Spaced Bambutition</h1>
       <div class="top-actions">
         <button class="icon-btn" id="notifyBtn" title="Activar notificaciones" aria-label="Activar notificaciones">
           <span aria-hidden="true">🔔</span>
@@ -47,6 +44,67 @@
     </header>
 
     <main class="app-shell">
+      <section class="hero-card" aria-label="Tu personaje">
+        <div class="hero-stage">
+          <div class="hero-sprite" id="heroSprite"></div>
+          <span class="hero-ground" aria-hidden="true"></span>
+        </div>
+        <div class="hero-info">
+          <p class="hero-class" id="heroClass">Aprendiz en taparrabos</p>
+          <p class="hero-level">
+            Nivel <strong id="levelStat">1</strong>
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: nivel y personaje">?</button>
+              <span class="help-popover" role="tooltip">Subes de nivel cada 250 puntos de experiencia (XP). La XP es todo lo que has ganado y nunca baja, aunque gastes puntos en recompensas. Cada dos niveles tu personaje consigue equipo nuevo.</span>
+            </span>
+          </p>
+          <div class="xp-bar" aria-hidden="true"><span id="xpFill"></span></div>
+          <p class="hero-next" id="xpText">0 / 250 XP</p>
+        </div>
+        <div class="hero-stats">
+          <div class="stat">
+            <span class="stat-label label-row">
+              ⭐ Puntos
+              <span class="help-wrap">
+                <button class="help-btn" type="button" aria-label="Ayuda: puntos">?</button>
+                <span class="help-popover" role="tooltip">Suben al completar repasos, tareas y monstruos, y bajan si saltas repasos. Se gastan en recompensas.</span>
+              </span>
+            </span>
+            <strong id="pointsStat">0</strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label label-row">
+              🔥 Racha
+              <span class="help-wrap">
+                <button class="help-btn" type="button" aria-label="Ayuda: racha">?</button>
+                <span class="help-popover" role="tooltip">Días seguidos completando al menos un repaso. Si pasa un día entero sin repasar, vuelve a 0.</span>
+              </span>
+            </span>
+            <strong id="streakStat">0 días</strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label label-row">
+              ✅ Hoy
+              <span class="help-wrap">
+                <button class="help-btn" type="button" aria-label="Ayuda: hoy">?</button>
+                <span class="help-popover" role="tooltip">Repasos que toca resolver hoy o que están atrasados.</span>
+              </span>
+            </span>
+            <strong id="todayStat">0 repasos</strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label label-row">
+              ⚖️ Carga
+              <span class="help-wrap">
+                <button class="help-btn" type="button" aria-label="Ayuda: carga">?</button>
+                <span class="help-popover" role="tooltip">Repasos programados hoy sobre tu máximo diario. Elige de 1 a 5 (recomendado: 3). La app reparte los repasos futuros moviéndolos solo unos días para no romper la curva, así que algún día puede pasarse un poco.</span>
+              </span>
+            </span>
+            <strong class="load-value"><span id="loadStat">0/</span><select id="dailyLimitSelect" aria-label="Máximo de repasos al día"></select></strong>
+          </div>
+        </div>
+      </section>
+
       <section class="workspace">
         <section class="main-panel">
           <nav class="tabs" aria-label="Vistas">
@@ -59,13 +117,13 @@
           <div id="todayView" class="view active">
             <div class="section-title">
               <h2 class="label-row">
-                ✅ Repasos pendientes
+                Repasos de hoy
                 <span class="help-wrap">
-                  <button class="help-btn" type="button" aria-label="Ayuda: repasos pendientes">?</button>
-                  <span class="help-popover" role="tooltip">Es lo que toca resolver hoy. Si algo está atrasado, aparece aquí hasta que se evalúe o se salte.</span>
+                  <button class="help-btn" type="button" aria-label="Ayuda: repasos de hoy">?</button>
+                  <span class="help-popover" role="tooltip">Es lo que toca resolver hoy. Si algo está atrasado, aparece aquí hasta que lo evalúes o lo saltes.</span>
                 </span>
               </h2>
-              <span id="dueCount" class="muted">0 pendientes</span>
+              <span id="dueCount" class="count-pill">0</span>
             </div>
             <div id="dueList" class="review-list"></div>
 
@@ -78,7 +136,7 @@
                     <span class="help-popover" role="tooltip">Planifica hasta 6 tareas clave para hoy, asigna pomodoros y marca las completadas para sumar puntos.</span>
                   </span>
                 </h2>
-                <span id="ivyCount" class="muted">0/6 tareas</span>
+                <span id="ivyCount" class="count-pill">0/6</span>
               </div>
               <div id="ivyStats" class="ivy-stats" aria-label="Estadísticas de pomodoros"></div>
               <form id="ivyForm" class="ivy-form">
@@ -95,55 +153,70 @@
                   <option value="yellow" selected>🟡 Media</option>
                   <option value="red">🔴 Difícil</option>
                 </select>
-                <button class="primary" type="submit">➕ Añadir</button>
+                <button class="primary" type="submit">Añadir</button>
               </form>
               <div id="ivyList" class="ivy-list"></div>
+            </section>
+
+            <section class="battle-section" aria-labelledby="battleTitle">
+              <div class="section-title">
+                <h2 id="battleTitle" class="label-row">
+                  ⚔️ Monstruo del día
+                  <span class="help-wrap">
+                    <button class="help-btn" type="button" aria-label="Ayuda: monstruo del día">?</button>
+                    <span class="help-popover" role="tooltip">Cada día aparece un monstruo. Es más fuerte cuantos más repasos, tareas y temas flojos tengas. Cada repaso o tarea Ivy Lee que completes hoy es un golpe. Si saltas un repaso, se cura y ese día escapa. Si lo derrotas, ganas puntos extra.</span>
+                  </span>
+                </h2>
+                <span id="battleStatus" class="count-pill">—</span>
+              </div>
+              <div id="battleArena" class="battle-arena"></div>
             </section>
           </div>
 
           <div id="calendarView" class="view">
             <div class="section-title">
-              <h2>🗓️ Próximos repasos</h2>
-              <span class="muted label-row">
-                30 dias
+              <h2 class="label-row">
+                Próximos 30 días
                 <span class="help-wrap">
                   <button class="help-btn" type="button" aria-label="Ayuda: calendario">?</button>
-                  <span class="help-popover" role="tooltip">Muestra los repasos pendientes de los próximos 30 días y si han sido adaptados.</span>
+                  <span class="help-popover" role="tooltip">Los repasos con borde continuo ya están programados. Los de borde discontinuo son una estimación suponiendo que sacas un 7: se recalculan con la nota real de cada repaso.</span>
                 </span>
-              </span>
+              </h2>
+              <span id="calendarCount" class="count-pill">0</span>
             </div>
             <div id="calendarList" class="calendar-list"></div>
           </div>
 
           <div id="progressView" class="view">
             <div class="section-title">
-              <h2>📈 Rendimiento</h2>
-              <span class="muted label-row">
-                <span id="averageScore">Sin notas</span>
+              <h2 class="label-row">
+                Rendimiento
                 <span class="help-wrap">
                   <button class="help-btn" type="button" aria-label="Ayuda: rendimiento">?</button>
-                  <span class="help-popover" role="tooltip">Resume nota media, dominio y factor de memoria de cada temario.</span>
+                  <span class="help-popover" role="tooltip">Arriba ves tu nota media semana a semana. Toca un tema para ver su evolución y los comentarios que escribiste en cada repaso.</span>
                 </span>
-              </span>
+              </h2>
+              <span id="averageScore" class="count-pill">Sin notas</span>
             </div>
+            <div id="overallChart" class="chart-card"></div>
             <div id="progressList" class="progress-grid"></div>
           </div>
 
           <div id="rewardsView" class="view">
             <div class="section-title">
-              <h2>🎁 Recompensas</h2>
-              <span class="muted label-row">
-                <span id="rewardPoints">0 puntos</span>
+              <h2 class="label-row">
+                Recompensas
                 <span class="help-wrap">
                   <button class="help-btn" type="button" aria-label="Ayuda: recompensas">?</button>
-                  <span class="help-popover" role="tooltip">Son premios que el alumno define y canjea con los puntos conseguidos.</span>
+                  <span class="help-popover" role="tooltip">Son premios que tú defines y canjeas con los puntos conseguidos.</span>
                 </span>
-              </span>
+              </h2>
+              <span id="rewardPoints" class="count-pill">0 puntos</span>
             </div>
             <form id="rewardForm" class="reward-form">
-              <input id="rewardName" required placeholder="Ir al cine" />
-              <input id="rewardCost" required type="number" min="10" step="5" value="100" />
-              <button class="primary" type="submit">➕ Añadir</button>
+              <input id="rewardName" required placeholder="Ir al cine" aria-label="Recompensa" />
+              <input id="rewardCost" required type="number" min="10" step="5" value="100" aria-label="Coste en puntos" />
+              <button class="primary" type="submit">Añadir</button>
             </form>
             <div id="rewardList" class="reward-list"></div>
           </div>
@@ -152,10 +225,10 @@
         <aside class="panel topic-panel" id="topicPanel">
           <div class="panel-head">
             <div class="panel-title-row">
-              <h2>➕ Nuevo temario</h2>
+              <h2>Nuevo tema</h2>
               <span class="help-wrap">
-                <button class="help-btn" type="button" aria-label="Ayuda: nuevo temario">?</button>
-                <span class="help-popover" role="tooltip">Crea un plan de repasos desde la fecha en la que se estudió ese tema.</span>
+                <button class="help-btn" type="button" aria-label="Ayuda: nuevo tema">?</button>
+                <span class="help-popover" role="tooltip">Crea el plan de repasos de un tema desde el día en que lo estudiaste. El primer repaso toca a las 24 horas; después la app alarga o acorta cada repaso según tu nota.</span>
               </span>
             </div>
             <button class="ghost panel-toggle" id="topicPanelToggle" type="button" aria-controls="topicPanelBody" aria-expanded="true">Ocultar</button>
@@ -163,128 +236,46 @@
           <div id="topicPanelBody" class="topic-panel-body">
             <form id="topicForm" class="stack">
               <div class="field-group">
-                <div class="field-label-row">
-                  <label class="field-label" for="subjectInput">🎓 Asignatura/Oposición</label>
-                  <span class="help-wrap">
-                    <button class="help-btn" type="button" aria-label="Ayuda: asignatura u oposición">?</button>
-                    <span class="help-popover" role="tooltip">Puedes poner una asignatura, una oposición o un bloque general de estudio.</span>
-                  </span>
-                </div>
+                <label class="field-label" for="subjectInput">🎓 Asignatura u oposición</label>
                 <input id="subjectInput" name="subject" list="subjectOptions" required placeholder="Administrativo del Estado" />
                 <datalist id="subjectOptions"></datalist>
               </div>
               <div class="field-group">
-                <div class="field-label-row">
-                  <label class="field-label" for="topicInput">📘 Tema o bloque</label>
-                  <span class="help-wrap">
-                    <button class="help-btn" type="button" aria-label="Ayuda: tema o bloque">?</button>
-                    <span class="help-popover" role="tooltip">Es la unidad concreta que quieres meter en la curva de repasos.</span>
-                  </span>
-                </div>
+                <label class="field-label" for="topicInput">📘 Tema o bloque</label>
                 <input id="topicInput" name="topic" required placeholder="Tema 4. Acto administrativo" />
               </div>
               <div class="field-group">
-                <div class="field-label-row">
-                  <label class="field-label" for="dateInput">📅 Fecha de estudio</label>
-                  <span class="help-wrap">
-                    <button class="help-btn" type="button" aria-label="Ayuda: fecha de estudio">?</button>
-                    <span class="help-popover" role="tooltip">La app programa el primer repaso 24 horas después de esta fecha.</span>
-                  </span>
-                </div>
+                <label class="field-label" for="dateInput">📅 Fecha de estudio</label>
                 <input id="dateInput" name="firstDate" type="date" required />
               </div>
               <label class="hardcore-toggle form-toggle">
                 <input id="hardcoreInput" name="hardcore" type="checkbox" />
                 <span>🔥 Modo hardcore <small>Más repasos y como mucho 35 días entre ellos. Puedes cambiarlo luego en Progreso.</small></span>
               </label>
-              <button class="primary" type="submit">➕ Crear plan</button>
+              <button class="primary" type="submit">Crear plan de repasos</button>
             </form>
-
-            <div class="curve-box">
-              <h3 class="label-row">
-                🧠 Secuencia
-                <span class="help-wrap">
-                  <button class="help-btn" type="button" aria-label="Ayuda: secuencia">?</button>
-                  <span class="help-popover" role="tooltip">Ejemplo sacando siempre un 7. Cada nota alarga o acorta el siguiente intervalo: con 9 o más se separa más, por debajo de 5 se vuelve a repasar al día siguiente. El último intervalo se repite siempre para no olvidar.</span>
-                </span>
-              </h3>
-              <p class="curve-label">Normal</p>
-              <div class="chips" id="curveChips"></div>
-              <p class="curve-label">🔥 Hardcore</p>
-              <div class="chips" id="curveChipsHardcore"></div>
-            </div>
           </div>
         </aside>
-      </section>
-
-      <section class="summary-band" aria-label="Resumen">
-        <div class="stat">
-          <span class="stat-label label-row">
-            ⭐ Puntos
-            <span class="help-wrap">
-              <button class="help-btn" type="button" aria-label="Ayuda: puntos">?</button>
-              <span class="help-popover" role="tooltip">Suben al completar repasos y pueden bajar si se saltan. Sirven para canjear recompensas.</span>
-            </span>
-          </span>
-          <strong id="pointsStat">0</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label label-row">
-            🔥 Racha
-            <span class="help-wrap">
-              <button class="help-btn" type="button" aria-label="Ayuda: racha">?</button>
-              <span class="help-popover" role="tooltip">Cuenta los días seguidos en los que se completa al menos un repaso. Si pasa un día entero sin repasar, vuelve a 0.</span>
-            </span>
-          </span>
-          <strong id="streakStat">0 dias</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label label-row">
-            🏆 Nivel
-            <span class="help-wrap">
-              <button class="help-btn" type="button" aria-label="Ayuda: nivel">?</button>
-              <span class="help-popover" role="tooltip">Sube cada 250 puntos para dar sensación de progreso acumulado.</span>
-            </span>
-          </span>
-          <strong id="levelStat">1</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label label-row">
-            ✅ Hoy
-            <span class="help-wrap">
-              <button class="help-btn" type="button" aria-label="Ayuda: hoy">?</button>
-              <span class="help-popover" role="tooltip">Número de repasos que toca resolver hoy o que están atrasados.</span>
-            </span>
-          </span>
-          <strong id="todayStat">0 repasos</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label label-row">
-            ⚖️ Carga
-            <span class="help-wrap">
-              <button class="help-btn" type="button" aria-label="Ayuda: carga">?</button>
-              <span class="help-popover" role="tooltip">Repasos programados hoy sobre tu máximo diario. Elige de 1 a 5 (recomendado: 3). La app reparte los repasos futuros moviéndolos solo unos días para no romper la curva, así que algún día puede pasarse un poco.</span>
-            </span>
-          </span>
-          <strong class="load-value"><span id="loadStat">0/</span><select id="dailyLimitSelect" aria-label="Máximo de repasos al día"></select></strong>
-        </div>
       </section>
     </main>
 
     <dialog id="reviewDialog">
       <form method="dialog" id="reviewForm" class="dialog-body">
         <div>
-          <p class="eyebrow" id="reviewSubject">Repaso</p>
+          <p class="dialog-kicker" id="reviewSubject">Repaso</p>
           <h2 id="reviewTitle">Tema</h2>
         </div>
+        <div id="reviewPastNotes" class="past-notes" hidden></div>
         <label>
           Nota del repaso
-          <input id="scoreInput" type="range" min="0" max="10" step="0.5" value="7" />
-          <output id="scoreOutput">7</output>
+          <span class="score-row">
+            <input id="scoreInput" type="range" min="0" max="10" step="0.5" value="7" />
+            <output id="scoreOutput">7</output>
+          </span>
         </label>
         <label>
-          Comentario opcional
-          <textarea id="noteInput" rows="3" placeholder="Qué ha fallado, qué conviene reforzar..."></textarea>
+          Comentario (fallos, qué reforzar…)
+          <textarea id="noteInput" rows="3" placeholder="Ej.: confundo plazos de alzada y reposición"></textarea>
         </label>
         <div class="dialog-actions">
           <button type="button" class="ghost" id="closeReview">Cancelar</button>
@@ -293,12 +284,26 @@
       </form>
     </dialog>
 
+    <dialog id="topicDialog" class="topic-dialog">
+      <div class="dialog-body">
+        <div class="dialog-head">
+          <div>
+            <p class="dialog-kicker" id="topicDialogSubject">Asignatura</p>
+            <h2 id="topicDialogTitle">Tema</h2>
+          </div>
+          <button type="button" class="icon-btn" id="closeTopicDialog" aria-label="Cerrar">✕</button>
+        </div>
+        <div id="topicDialogBody"></div>
+      </div>
+    </dialog>
+
     <template id="emptyStateTemplate">
       <div class="empty-state">
         <strong>✨ Todo en orden.</strong>
       </div>
     </template>
 
+    <script src="sprites.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

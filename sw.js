@@ -1,8 +1,9 @@
-const cacheName = "spaced-bambutition-v8";
+const cacheName = "spaced-bambutition-v9";
 const appShell = [
   "./",
   "./index.html",
   "./styles.css",
+  "./sprites.js",
   "./app.js",
   "./app.webmanifest",
   "./icons/icon.svg",

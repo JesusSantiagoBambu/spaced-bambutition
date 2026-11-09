@@ -18,6 +18,8 @@ const srsConfig = {
   },
 };
 const ivyTaskLimit = 6;
+const xpPerLevel = 250;
+const seenTierKey = "spaced-bambutition-seen-tier";
 const ivyPointsPerPomodoro = 5;
 const pomodoroDurations = [25, 30, 35, 50];
 const ivyDifficulties = {
@@ -41,6 +43,7 @@ const state = loadState();
 let activeReviewId = null;
 let lastNotificationKey = "";
 let deferredInstallPrompt = null;
+let renderedHeroTier = null;
 
 const els = {
   pointsStat: document.querySelector("#pointsStat"),
@@ -63,7 +66,6 @@ const els = {
   averageScore: document.querySelector("#averageScore"),
   rewardPoints: document.querySelector("#rewardPoints"),
   rewardList: document.querySelector("#rewardList"),
-  curveChips: document.querySelector("#curveChips"),
   topicPanel: document.querySelector("#topicPanel"),
   topicPanelBody: document.querySelector("#topicPanelBody"),
   topicPanelToggle: document.querySelector("#topicPanelToggle"),
@@ -88,13 +90,36 @@ const els = {
   installDeviceText: document.querySelector("#installDeviceText"),
   installNowBtn: document.querySelector("#installNowBtn"),
   dailyLimitSelect: document.querySelector("#dailyLimitSelect"),
-  curveChipsHardcore: document.querySelector("#curveChipsHardcore"),
+  heroSprite: document.querySelector("#heroSprite"),
+  heroClass: document.querySelector("#heroClass"),
+  xpFill: document.querySelector("#xpFill"),
+  xpText: document.querySelector("#xpText"),
+  battleArena: document.querySelector("#battleArena"),
+  battleStatus: document.querySelector("#battleStatus"),
+  calendarCount: document.querySelector("#calendarCount"),
+  overallChart: document.querySelector("#overallChart"),
+  reviewPastNotes: document.querySelector("#reviewPastNotes"),
+  topicDialog: document.querySelector("#topicDialog"),
+  topicDialogSubject: document.querySelector("#topicDialogSubject"),
+  topicDialogTitle: document.querySelector("#topicDialogTitle"),
+  topicDialogBody: document.querySelector("#topicDialogBody"),
+  closeTopicDialog: document.querySelector("#closeTopicDialog"),
 };
+let openTopicId = null;
 
 document.querySelector("#dateInput").valueAsDate = new Date();
 
-renderCurveChips(els.curveChips, false);
-renderCurveChips(els.curveChipsHardcore, true);
+els.closeTopicDialog.addEventListener("click", () => els.topicDialog.close());
+els.topicDialog.addEventListener("close", () => { openTopicId = null; });
+[els.topicDialog, els.reviewDialog].forEach((dialog) => {
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+});
+window.addEventListener("resize", () => {
+  if (els.overallChart.offsetWidth) renderOverallChart();
+  if (openTopicId) renderTopicDialog();
+});
 
 dailyLimitOptions.forEach((value) => {
   const option = document.createElement("option");
@@ -242,6 +267,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
     document.querySelectorAll(".tab, .view").forEach((item) => item.classList.remove("active"));
     tab.classList.add("active");
     document.querySelector(`#${tab.dataset.view}View`).classList.add("active");
+    if (tab.dataset.view === "progress") renderOverallChart();
   });
 });
 
@@ -431,6 +457,7 @@ function normalizeState(raw) {
     rewards: Array.isArray(raw.rewards) && raw.rewards.length ? raw.rewards : makeInitialRewards(),
     ivyTasks: Array.isArray(raw.ivyTasks) ? raw.ivyTasks.map(normalizeIvyTask) : [],
     history: Array.isArray(raw.history) ? raw.history : [],
+    battle: raw.battle && typeof raw.battle === "object" ? raw.battle : null,
   };
 }
 
@@ -722,37 +749,6 @@ function scheduleNext(srs, mode, score, base, daysLate) {
   return { srs: next, gap, profile };
 }
 
-// Trayectoria tipica (siempre la misma nota) para mostrar la secuencia en pantalla.
-function projectPath(hardcore, score = 7, steps = 8) {
-  const mode = hardcore ? srsConfig.modes.hardcore : srsConfig.modes.normal;
-  let srs = { ...makeInitialSrs(new Date()), interval: srsConfig.firstIntervalDays };
-  const gaps = [srsConfig.firstIntervalDays];
-  let base = srsConfig.firstIntervalDays;
-  while (gaps.length < steps) {
-    const result = scheduleNext(srs, mode, score, base, 0);
-    srs = result.srs;
-    base = result.gap;
-    gaps.push(result.gap);
-  }
-  return gaps;
-}
-
-function renderCurveChips(container, hardcore) {
-  if (!container) return;
-  container.replaceChildren();
-  const maxInterval = (hardcore ? srsConfig.modes.hardcore : srsConfig.modes.normal).maxInterval;
-  const path = projectPath(hardcore, 7, 14);
-  const capIndex = path.indexOf(maxInterval);
-  const visible = capIndex >= 0 ? path.slice(0, capIndex + 1) : path;
-  visible.forEach((gap, index) => {
-    const chip = document.createElement("span");
-    chip.className = "chip";
-    if (index === 0) chip.textContent = "24 h";
-    else chip.textContent = gap === maxInterval ? `cada ${gap} d 🔁` : `+${gap} d`;
-    container.append(chip);
-  });
-}
-
 function parseDate(value) {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day, 9, 0, 0);
@@ -986,6 +982,7 @@ function recomputePointsFromHistory() {
   const earned = state.history.reduce((sum, item) => {
     if (item.type === "completed") return sum + (Number(item.points) || 0);
     if (item.type === "ivy") return sum + (Number(item.points) || 0);
+    if (item.type === "monster") return sum + (Number(item.points) || 0);
     if (item.type === "skipped") return sum - (Number(item.penalty) || 0);
     return sum;
   }, 0);
@@ -1265,47 +1262,51 @@ function render() {
     : 0;
   const todayLoad = countReviewsOn(new Date());
 
+  const battle = updateBattle();
+
   els.pointsStat.textContent = state.points;
   const streak = currentStreak();
-  els.streakStat.textContent = `${streak} ${streak === 1 ? "dia" : "dias"}`;
-  els.levelStat.textContent = Math.floor(state.points / 250) + 1;
+  els.streakStat.textContent = `${streak} ${streak === 1 ? "día" : "días"}`;
   els.todayStat.textContent = `${due.length} ${due.length === 1 ? "repaso" : "repasos"}`;
   els.loadStat.textContent = `${todayLoad}/`;
   els.dailyLimitSelect.value = String(dailyLimit());
-  els.dueCount.textContent = `${due.length} pendientes`;
-  els.ivyCount.textContent = `${completedIvyTasks.length}/${ivyTasks.length || ivyTaskLimit} tareas`;
-  els.averageScore.textContent = completed.length ? `Media ${average.toFixed(1)}/10` : "Sin notas";
+  els.dueCount.textContent = due.length ? `${due.length} ${due.length === 1 ? "pendiente" : "pendientes"}` : "Al día";
+  els.ivyCount.textContent = `${completedIvyTasks.length}/${ivyTasks.length || ivyTaskLimit} hechas`;
+  els.averageScore.textContent = completed.length ? `Media ${formatScore(average)}` : "Sin notas";
   els.rewardPoints.textContent = `${state.points} puntos`;
 
+  renderHero();
   renderSubjectOptions();
   renderDueList(due);
   renderIvyStats(ivyPomodoroStats());
   renderIvyTasks(ivyTasks);
+  renderBattle(battle);
   renderCalendar();
   renderProgress();
   renderRewards();
+  if (openTopicId) renderTopicDialog();
 }
 
 function renderDueList(items) {
   els.dueList.replaceChildren();
-  if (!items.length) return renderEmpty(els.dueList);
+  if (!items.length) return renderEmpty(els.dueList, "✨ No tienes repasos pendientes hoy.");
 
   items.forEach((item) => {
     const dueDate = new Date(item.dueDate);
     const daysLate = Math.max(0, dayDistance(new Date(), dueDate));
     const overdue = daysLate > 0;
     const card = document.createElement("article");
-    card.className = `review-card${overdue ? " overdue" : ""}`;
+    card.className = `review-card${overdue ? " overdue" : ""}${item.topic.hardcore ? " is-hardcore" : ""}`;
     card.innerHTML = `
       <div>
-        <span class="badge ${overdue ? "warning" : "brand"}">${overdue ? `⚠️ Atrasado ${daysLate}d` : "✅ Toca hoy"} · Repaso ${item.step}${item.topic.hardcore ? " · 🔥" : ""}</span>
-        <p class="card-title">📘 ${escapeHtml(item.topic.title)}</p>
+        <span class="badge ${overdue ? "warning" : "brand"}">${overdue ? `Atrasado ${daysLate} ${daysLate === 1 ? "día" : "días"}` : "Toca hoy"} · Repaso ${item.step}</span>
+        <p class="card-title">${topicNameHtml(item.topic)}</p>
         <p class="card-meta">${escapeHtml(item.topic.subject)} · ${formatDate(dueDate)}</p>
         ${item.adjustmentReason ? `<p class="card-note">${escapeHtml(item.adjustmentReason)}</p>` : ""}
       </div>
       <div class="review-actions">
-        <button class="ghost skip-btn" type="button">⏭️ Saltar</button>
-        <button class="primary" type="button">📝 Evaluar</button>
+        <button class="ghost skip-btn" type="button">Saltar</button>
+        <button class="primary" type="button">Evaluar</button>
       </div>
     `;
     card.querySelector(".primary").addEventListener("click", () => openReview(item));
@@ -1316,7 +1317,7 @@ function renderDueList(items) {
 
 function renderIvyTasks(tasks) {
   els.ivyList.replaceChildren();
-  if (!tasks.length) return renderEmpty(els.ivyList);
+  if (!tasks.length) return renderEmpty(els.ivyList, "Añade hasta 6 tareas clave para hoy.");
 
   tasks.forEach((task) => {
     const difficulty = ivyDifficulties[task.difficulty] || ivyDifficulties.yellow;
@@ -1368,67 +1369,530 @@ function renderIvyStats(stats) {
   `;
 }
 
+// ---------- Utilidades de presentacion ----------
+
+function topicNameHtml(topic) {
+  return topic.hardcore
+    ? `<span class="topic-name is-hardcore">🔥 ${escapeHtml(topic.title)}</span>`
+    : `<span class="topic-name">📘 ${escapeHtml(topic.title)}</span>`;
+}
+
+function formatScore(value) {
+  return Number(value).toLocaleString("es", { maximumFractionDigits: 1 });
+}
+
+function scoreTone(score) {
+  const key = getScoreProfile(score).key;
+  return key === "easy" || key === "good" ? "good" : key === "hard" ? "fragile" : "weak";
+}
+
+function completedReviewsOf(topic) {
+  return topic.reviews
+    .filter((review) => review.completedAt && typeof review.score === "number")
+    .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+}
+
+function relativeDayLabel(date) {
+  const diff = dayDistance(date, new Date());
+  if (diff === 0) return "Hoy";
+  if (diff === 1) return "Mañana";
+  if (diff === -1) return "Ayer";
+  return new Intl.DateTimeFormat("es", { weekday: "long" }).format(date).replace(/^./, (c) => c.toUpperCase());
+}
+
+// ---------- Heroe y experiencia ----------
+
+
+function lifetimeXp() {
+  const earned = state.history.reduce((sum, item) => {
+    if (item.type === "completed" || item.type === "ivy" || item.type === "monster") return sum + (Number(item.points) || 0);
+    if (item.type === "skipped") return sum - (Number(item.penalty) || 0);
+    return sum;
+  }, 0);
+  return Math.max(0, earned, state.points);
+}
+
+function levelInfo() {
+  const tiers = window.BambuSprites.heroTiers;
+  const xp = lifetimeXp();
+  const level = Math.floor(xp / xpPerLevel) + 1;
+  const tier = Math.min(tiers.length - 1, Math.floor((level - 1) / 2));
+  const nextTierLevel = tier < tiers.length - 1 ? (tier + 1) * 2 + 1 : null;
+  return { xp, level, tier, into: xp % xpPerLevel, nextTierLevel, tiers };
+}
+
+
+function renderHero() {
+  const info = levelInfo();
+  els.levelStat.textContent = info.level;
+  els.heroClass.textContent = info.tiers[info.tier].name;
+  els.xpFill.style.width = `${Math.round((info.into / xpPerLevel) * 100)}%`;
+  const next = info.nextTierLevel
+    ? `Nivel ${info.nextTierLevel}: ${info.tiers[info.tier + 1].name.toLowerCase()}`
+    : "Equipo legendario completo";
+  els.xpText.textContent = `${info.into}/${xpPerLevel} XP para el nivel ${info.level + 1} · ${next}`;
+
+  if (renderedHeroTier !== info.tier) {
+    els.heroSprite.innerHTML = window.BambuSprites.heroSVG(info.tier);
+    renderedHeroTier = info.tier;
+  }
+
+  let seen = null;
+  try { seen = localStorage.getItem(seenTierKey); } catch {}
+  if (seen === null) {
+    try { localStorage.setItem(seenTierKey, String(info.tier)); } catch {}
+  } else if (info.tier > Number(seen)) {
+    try { localStorage.setItem(seenTierKey, String(info.tier)); } catch {}
+    els.heroSprite.classList.remove("level-up");
+    void els.heroSprite.offsetWidth;
+    els.heroSprite.classList.add("level-up");
+    showToast(`¡Nuevo equipo! Ahora eres: ${info.tiers[info.tier].name}`);
+  }
+}
+
+function showToast(message) {
+  let toast = document.querySelector(".toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.className = "toast";
+    toast.setAttribute("role", "status");
+    document.body.append(toast);
+  }
+  toast.textContent = message;
+  toast.classList.remove("show");
+  void toast.offsetWidth;
+  toast.classList.add("show");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove("show"), 4200);
+}
+
+// ---------- Monstruo del dia ----------
+
+function hashString(value) {
+  return Array.from(value).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 7);
+}
+
+function monsterIndexForThreat(threat) {
+  if (threat <= 0) return -1;
+  if (threat <= 2) return 0;
+  if (threat <= 4) return 1;
+  if (threat <= 6) return 2;
+  if (threat <= 8) return 3;
+  if (threat <= 11) return 4;
+  return 5;
+}
+
+function battleSnapshot() {
+  const today = dateKey(new Date());
+  const isToday = (value) => value && dateKey(value) === today;
+  const reviewsDone = state.history.filter((item) => item.type === "completed" && isToday(item.completedAt)).length;
+  const ivyDone = state.history.filter((item) => item.type === "ivy" && isToday(item.completedAt)).length;
+  const skipped = state.history.filter((item) => item.type === "skipped" && isToday(item.skippedAt)).length;
+  const due = dueReviews();
+  const ivyPending = todayIvyTasks().filter((task) => !task.completedAt).length;
+  const overdue = due.filter((item) => new Date(item.dueDate) < startOfToday()).length;
+  const weak = state.topics.filter((topic) => {
+    const done = completedReviewsOf(topic);
+    const last = done[done.length - 1];
+    return topic.srs?.relearning || (last && last.score < 5);
+  }).length;
+  const hits = reviewsDone + ivyDone;
+  const total = hits + due.length + ivyPending + skipped;
+  return { hits, total, skipped, threat: total + weak + overdue, remaining: due.length + ivyPending };
+}
+
+function updateBattle() {
+  const snapshot = battleSnapshot();
+  const today = dateKey(new Date());
+  let changed = false;
+  if (!state.battle || state.battle.date !== today) {
+    state.battle = { date: today, monster: -1, variant: hashString(today) % 3, defeated: false, reward: 0 };
+    changed = true;
+  }
+  const battle = state.battle;
+  const index = snapshot.total > 0 ? monsterIndexForThreat(snapshot.threat) : -1;
+  if (!battle.defeated && index > battle.monster) {
+    battle.monster = index;
+    changed = true;
+  }
+  if (!battle.defeated && battle.monster >= 0 && snapshot.total > 0 && snapshot.hits >= snapshot.total && snapshot.skipped === 0) {
+    const monster = window.BambuSprites.monsters[battle.monster];
+    const reward = 10 + battle.monster * 5;
+    battle.defeated = true;
+    battle.reward = reward;
+    state.points += reward;
+    state.history.unshift({
+      id: crypto.randomUUID(),
+      type: "monster",
+      monster: `${monster.name} ${monster.variants[battle.variant % monster.variants.length].label}`,
+      points: reward,
+      completedAt: new Date().toISOString(),
+    });
+    changed = true;
+    setTimeout(() => showToast(`¡Has derrotado al ${monster.name.toLowerCase()}! +${reward} puntos`), 50);
+  }
+  if (changed) saveState();
+  return snapshot;
+}
+
+function renderBattle(snapshot) {
+  const battle = state.battle;
+  const heroTier = levelInfo().tier;
+  const heroSvg = window.BambuSprites.heroSVG(heroTier);
+
+  if (!battle || battle.monster < 0 || (!battle.defeated && snapshot.total === 0)) {
+    els.battleStatus.textContent = "Sin rival";
+    els.battleArena.innerHTML = `
+      <div class="arena-scene is-calm">
+        <div class="arena-hero">${heroSvg}</div>
+        <p class="arena-calm">Hoy no hay ningún monstruo a la vista. Añade tareas Ivy Lee o crea temas y aparecerá uno.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const monster = window.BambuSprites.monsters[battle.monster];
+  const variant = monster.variants[battle.variant % monster.variants.length];
+  const hp = Math.max(0, snapshot.total - snapshot.hits);
+  const hpPercent = snapshot.total ? Math.round((hp / snapshot.total) * 100) : 0;
+  const escaped = !battle.defeated && snapshot.skipped > 0 && snapshot.remaining === 0;
+  const stateClass = battle.defeated ? "is-defeated" : escaped ? "is-escaped" : "";
+  let message;
+  if (battle.defeated) message = `¡Derrotado! Has ganado ${battle.reward} puntos extra.`;
+  else if (escaped) message = "Se ha escapado: saltaste un repaso y se curó. Mañana tendrás otra oportunidad.";
+  else if (snapshot.skipped > 0) message = "Saltar un repaso lo ha curado: hoy ya no podrás derrotarlo, pero cada golpe sigue sumando.";
+  else message = `Te faltan ${hp} ${hp === 1 ? "golpe" : "golpes"}: cada repaso o tarea Ivy Lee completada hoy le quita vida. Recompensa: ${10 + battle.monster * 5} puntos.`;
+
+  els.battleStatus.textContent = battle.defeated ? "Derrotado" : escaped ? "Escapó" : `Vida ${hp}/${snapshot.total}`;
+  els.battleArena.innerHTML = `
+    <div class="arena-scene ${stateClass}">
+      <div class="arena-hero">${heroSvg}</div>
+      <span class="arena-vs" aria-hidden="true">VS</span>
+      <div class="arena-monster">${window.BambuSprites.monsterSVG(battle.monster, battle.variant)}</div>
+    </div>
+    <div class="arena-info">
+      <div class="arena-name-row">
+        <p class="monster-name">${monster.name} ${variant.label}</p>
+        <span class="monster-rank">Rango ${battle.monster + 1}/6</span>
+      </div>
+      <div class="hp-bar" role="img" aria-label="Vida del monstruo ${hp} de ${snapshot.total}"><span style="width: ${hpPercent}%"></span></div>
+      <p class="arena-message">${message}</p>
+    </div>
+  `;
+}
+
+// ---------- Calendario con repasos estimados ----------
+
+function projectedReviews(topic, limitDate) {
+  const pending = pendingReviewOf(topic);
+  if (!pending || !topic.srs) return [];
+  const projected = [];
+  let srs = { ...topic.srs };
+  let base = srs.relearning ? srs.interval : Math.max(1, Number(pending.intervalDays) || 1);
+  let anchor = new Date(pending.dueDate) < startOfToday() ? atReviewTime(startOfToday()) : atReviewTime(pending.dueDate);
+  let step = pending.step;
+  for (let index = 0; index < 30; index += 1) {
+    const result = scheduleNext(srs, topicMode(topic), 7, base, 0);
+    srs = result.srs;
+    base = result.gap;
+    anchor = addDays(anchor, result.gap);
+    step += 1;
+    if (anchor > limitDate) break;
+    projected.push({ topic, dueDate: anchor, step, estimated: true });
+  }
+  return projected;
+}
+
 function renderCalendar() {
   const limit = addDays(startOfToday(), 30);
-  const upcoming = allReviews()
-    .filter((item) => !item.completedAt && new Date(item.dueDate) <= limit)
-    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  const today = startOfToday();
+  const items = [];
+  state.topics.forEach((topic) => {
+    const pending = pendingReviewOf(topic);
+    if (!pending) return;
+    const dueDate = new Date(pending.dueDate);
+    if (dueDate > limit) return;
+    items.push({ topic, review: pending, dueDate: dueDate < today ? atReviewTime(today) : dueDate, overdue: dueDate < today, step: pending.step, estimated: false });
+    items.push(...projectedReviews(topic, limit));
+  });
+  items.sort((a, b) => a.dueDate - b.dueDate || Number(a.estimated) - Number(b.estimated));
 
+  const realCount = items.filter((item) => !item.estimated).length;
+  els.calendarCount.textContent = `${realCount} ${realCount === 1 ? "programado" : "programados"}`;
   els.calendarList.replaceChildren();
-  if (!upcoming.length) return renderEmpty(els.calendarList);
+  if (!items.length) return renderEmpty(els.calendarList, "No hay repasos en los próximos 30 días.");
 
-  upcoming.forEach((item) => {
-    const dueDate = new Date(item.dueDate);
-    const row = document.createElement("article");
-    row.className = "calendar-row";
-    row.innerHTML = `
-      <div class="date-pill">🗓️ ${shortDate(dueDate)}</div>
-      <div>
-        <p class="card-title">📘 ${escapeHtml(item.topic.title)}</p>
-        <p class="card-meta">${escapeHtml(item.topic.subject)} · carga ${countReviewsOn(dueDate)}/${dailyLimit()}</p>
-        ${item.adjustmentReason ? `<p class="card-note">${escapeHtml(item.adjustmentReason)}</p>` : ""}
-      </div>
-      <span class="badge ${item.topic.hardcore ? "hardcore" : item.adjusted ? "brand" : ""}">${item.topic.hardcore ? "🔥 Hardcore" : item.adjusted ? "🧠 Adaptado" : `Repaso ${item.step}`}</span>
+  const groups = new Map();
+  items.forEach((item) => {
+    const key = dateKey(item.dueDate);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+
+  groups.forEach((dayItems, key) => {
+    const date = parseDate(key);
+    const real = dayItems.filter((item) => !item.estimated).length;
+    const over = real > dailyLimit();
+    const day = document.createElement("section");
+    day.className = "calendar-day";
+    day.innerHTML = `
+      <header class="calendar-day-head">
+        <div class="calendar-date">
+          <span class="calendar-day-num">${date.getDate()}</span>
+          <span class="calendar-month">${new Intl.DateTimeFormat("es", { month: "short" }).format(date)}</span>
+        </div>
+        <div>
+          <p class="calendar-weekday">${relativeDayLabel(date)}</p>
+          <p class="calendar-load${over ? " is-over" : ""}">${real}/${dailyLimit()} programados${dayItems.length > real ? ` · ${dayItems.length - real} estimados` : ""}</p>
+        </div>
+      </header>
+      <div class="calendar-items"></div>
     `;
-    els.calendarList.append(row);
+    const list = day.querySelector(".calendar-items");
+    dayItems.forEach((item) => {
+      const row = document.createElement("article");
+      row.className = `calendar-row${item.estimated ? " is-estimated" : ""}${item.topic.hardcore ? " is-hardcore" : ""}`;
+      const badge = item.estimated
+        ? `<span class="badge ghost-badge">Estimado</span>`
+        : item.overdue
+          ? `<span class="badge warning">Atrasado</span>`
+          : `<span class="badge brand">Repaso ${item.step}</span>`;
+      row.innerHTML = `
+        <div>
+          <p class="card-title">${topicNameHtml(item.topic)}</p>
+          <p class="card-meta">${escapeHtml(item.topic.subject)}${item.estimated ? ` · repaso ${item.step} si sacas un 7` : ""}</p>
+        </div>
+        ${badge}
+      `;
+      list.append(row);
+    });
+    els.calendarList.append(day);
   });
 }
 
+// ---------- Graficas ----------
+
+// Grafica de linea de una sola serie (notas de 0 a 10) con tooltip al pasar o tocar.
+function drawScoreChart(container, points, { ariaLabel, emptyText }) {
+  container.replaceChildren();
+  const valid = points.filter((point) => typeof point.value === "number");
+  if (!valid.length) {
+    container.innerHTML = `<p class="chart-empty">${emptyText}</p>`;
+    return;
+  }
+  const width = Math.max(260, container.clientWidth || 560);
+  const height = width < 420 ? 170 : 200;
+  const pad = { top: 14, right: 16, bottom: 28, left: 30 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const x = (index) => pad.left + (points.length === 1 ? plotW / 2 : (index / (points.length - 1)) * plotW);
+  const y = (value) => pad.top + plotH - (value / 10) * plotH;
+
+  let grid = "";
+  [0, 5, 10].forEach((value) => {
+    grid += `<line class="chart-grid${value === 5 ? " is-pass" : ""}" x1="${pad.left}" x2="${width - pad.right}" y1="${y(value)}" y2="${y(value)}"/>`;
+    grid += `<text class="chart-axis" x="${pad.left - 8}" y="${y(value) + 4}" text-anchor="end">${value}</text>`;
+  });
+
+  let path = "";
+  let pen = false;
+  points.forEach((point, index) => {
+    if (typeof point.value !== "number") { pen = false; return; }
+    path += `${pen ? "L" : "M"}${x(index).toFixed(1)},${y(point.value).toFixed(1)}`;
+    pen = true;
+  });
+
+  const labelEvery = Math.max(1, Math.ceil(points.length / Math.floor(plotW / 56)));
+  let labels = "";
+  points.forEach((point, index) => {
+    if (index % labelEvery !== 0 && index !== points.length - 1) return;
+    if (index !== points.length - 1 && points.length - 1 - index < labelEvery) return;
+    labels += `<text class="chart-axis" x="${x(index)}" y="${height - 8}" text-anchor="middle">${escapeHtml(point.label)}</text>`;
+  });
+
+  let dots = "";
+  points.forEach((point, index) => {
+    if (typeof point.value !== "number") return;
+    dots += `<circle class="chart-dot tone-${scoreTone(point.value)}" cx="${x(index)}" cy="${y(point.value)}" r="5"/>`;
+    dots += `<circle class="chart-hit" data-index="${index}" cx="${x(index)}" cy="${y(point.value)}" r="16" tabindex="0"/>`;
+  });
+
+  container.innerHTML = `
+    <div class="chart-wrap">
+      <svg class="score-chart" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(ariaLabel)}">
+        ${grid}${labels}
+        <path class="chart-line" d="${path}"/>
+        ${dots}
+      </svg>
+      <div class="chart-tooltip" hidden></div>
+    </div>
+  `;
+  const tooltip = container.querySelector(".chart-tooltip");
+  const show = (hit) => {
+    const point = points[Number(hit.dataset.index)];
+    tooltip.innerHTML = point.tooltip;
+    tooltip.hidden = false;
+    const cx = Number(hit.getAttribute("cx"));
+    const cy = Number(hit.getAttribute("cy"));
+    const tipWidth = tooltip.offsetWidth;
+    tooltip.style.left = `${clamp(cx - tipWidth / 2, 0, width - tipWidth)}px`;
+    tooltip.style.top = `${Math.max(0, cy - tooltip.offsetHeight - 12)}px`;
+  };
+  container.querySelectorAll(".chart-hit").forEach((hit) => {
+    hit.addEventListener("pointerenter", () => show(hit));
+    hit.addEventListener("focus", () => show(hit));
+    hit.addEventListener("click", (event) => { event.stopPropagation(); show(hit); });
+    hit.addEventListener("pointerleave", () => { tooltip.hidden = true; });
+    hit.addEventListener("blur", () => { tooltip.hidden = true; });
+  });
+}
+
+function weeklyAverages(weeks = 8) {
+  const today = startOfToday();
+  const monday = addDays(today, -((today.getDay() + 6) % 7));
+  const buckets = Array.from({ length: weeks }, (_, index) => {
+    const start = startOfDay(addDays(monday, -7 * (weeks - 1 - index)));
+    return { start, end: startOfDay(addDays(start, 7)), scores: [] };
+  });
+  state.history.forEach((item) => {
+    if (item.type !== "completed" || typeof item.score !== "number") return;
+    const date = new Date(item.completedAt);
+    const bucket = buckets.find((week) => date >= week.start && date < week.end);
+    if (bucket) bucket.scores.push(item.score);
+  });
+  return buckets.map((week) => {
+    const avg = week.scores.length ? week.scores.reduce((a, b) => a + b, 0) / week.scores.length : null;
+    const label = shortDate(week.start);
+    return {
+      label,
+      value: avg,
+      tooltip: avg === null ? "" : `<strong>Semana del ${label}</strong><span>Media ${formatScore(avg)} · ${week.scores.length} ${week.scores.length === 1 ? "repaso" : "repasos"}</span>`,
+    };
+  });
+}
+
+function renderOverallChart() {
+  const container = els.overallChart;
+  container.innerHTML = `<div class="chart-head"><h3>Nota media por semana</h3><span class="muted">Últimas 8 semanas</span></div><div class="chart-body"></div>`;
+  drawScoreChart(container.querySelector(".chart-body"), weeklyAverages(), {
+    ariaLabel: "Nota media de los repasos en cada una de las últimas 8 semanas",
+    emptyText: "Cuando evalúes tus primeros repasos verás aquí tu evolución semana a semana.",
+  });
+}
+
+function sparklineSvg(scores) {
+  if (scores.length < 2) return "";
+  const width = 120;
+  const height = 32;
+  const points = scores.map((score, index) => `${(index / (scores.length - 1)) * (width - 6) + 3},${height - 3 - (score / 10) * (height - 6)}`);
+  const last = points[points.length - 1].split(",");
+  return `<svg class="sparkline" viewBox="0 0 ${width} ${height}" aria-hidden="true"><polyline points="${points.join(" ")}"/><circle cx="${last[0]}" cy="${last[1]}" r="3.5"/></svg>`;
+}
+
+// ---------- Progreso y detalle de tema ----------
+
 function renderProgress() {
   els.progressList.replaceChildren();
-  if (!state.topics.length) return renderEmpty(els.progressList);
+  if (els.overallChart.offsetWidth) renderOverallChart();
+  if (!state.topics.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = "<strong>Aún no tienes temas.</strong><span>Crea tu primer tema en «Nuevo tema» para empezar a ver tu evolución.</span>";
+    els.progressList.append(empty);
+    return;
+  }
 
   state.topics.forEach((topic) => {
-    const done = topic.reviews.filter((review) => review.completedAt);
-    const average = done.length ? done.reduce((sum, review) => sum + review.score, 0) / done.length : 0;
+    const done = completedReviewsOf(topic);
+    const average = done.length ? done.reduce((sum, review) => sum + review.score, 0) / done.length : null;
     const nextReview = pendingReviewOf(topic);
-    const interval = topic.srs?.interval || 1;
-    const card = document.createElement("article");
+    const notes = done.filter((review) => review.note).length;
+    const card = document.createElement("button");
+    card.type = "button";
     card.className = `topic-card${topic.hardcore ? " is-hardcore" : ""}`;
+    card.setAttribute("aria-label", `Ver evolución y notas de ${topic.title}`);
     card.innerHTML = `
       <div class="topic-card-head">
         <div>
-          <p class="card-title">📘 ${escapeHtml(topic.title)}</p>
-          <p class="card-meta">${escapeHtml(topic.subject)} · ${done.length} ${done.length === 1 ? "repaso hecho" : "repasos hechos"} · intervalo ${interval} ${interval === 1 ? "día" : "días"}</p>
+          <p class="card-title">${topicNameHtml(topic)}</p>
+          <p class="card-meta">${escapeHtml(topic.subject)}</p>
         </div>
-        <button class="ghost danger delete-topic" type="button" aria-label="Borrar ${escapeHtml(topic.title)}">🗑️ Borrar</button>
+        <span class="topic-score tone-${average === null ? "none" : scoreTone(average)}">${average === null ? "–" : formatScore(average)}</span>
       </div>
-      <div class="score-bar" aria-label="Nota media">
-        <div class="score-fill" style="width: ${average * 10}%"></div>
-      </div>
+      ${sparklineSvg(done.map((review) => review.score)) || `<p class="card-meta">${done.length ? "1 repaso hecho" : "Sin repasos todavía"}</p>`}
       <div class="topic-metrics">
-        <strong>${done.length ? average.toFixed(1) : "-"} / 10</strong>
         <span class="badge brand">🧠 Dominio ${Math.round(topic.mastery)}%</span>
-        <span class="badge">${nextReview ? `⏭️ Próximo ${shortDate(new Date(nextReview.dueDate))}` : "✅ Al día"}</span>
+        <span class="badge">⏭️ ${nextReview ? shortDate(new Date(nextReview.dueDate)) : "Al día"}</span>
+        ${notes ? `<span class="badge">💬 ${notes} ${notes === 1 ? "nota" : "notas"}</span>` : ""}
       </div>
-      <label class="hardcore-toggle">
-        <input type="checkbox" ${topic.hardcore ? "checked" : ""} />
-        <span>🔥 Modo hardcore <small>${topic.hardcore ? `más repasos, máximo ${srsConfig.modes.hardcore.maxInterval} días` : "desactivado"}</small></span>
-      </label>
     `;
-    card.querySelector(".delete-topic").addEventListener("click", () => deleteTopic(topic.id));
-    card.querySelector(".hardcore-toggle input").addEventListener("change", (event) => setHardcore(topic.id, event.target.checked));
+    card.addEventListener("click", () => openTopicDialog(topic.id));
     els.progressList.append(card);
+  });
+}
+
+function openTopicDialog(topicId) {
+  openTopicId = topicId;
+  if (!els.topicDialog.open) els.topicDialog.showModal();
+  renderTopicDialog();
+}
+
+function renderTopicDialog() {
+  const topic = state.topics.find((item) => item.id === openTopicId);
+  if (!topic) {
+    els.topicDialog.close();
+    return;
+  }
+  const done = completedReviewsOf(topic);
+  const average = done.length ? done.reduce((sum, review) => sum + review.score, 0) / done.length : null;
+  const nextReview = pendingReviewOf(topic);
+  const interval = topic.srs?.interval || 1;
+
+  els.topicDialogSubject.textContent = topic.subject;
+  els.topicDialogTitle.innerHTML = topicNameHtml(topic);
+  els.topicDialogBody.innerHTML = `
+    <div class="detail-metrics">
+      <div><span>Media</span><strong>${average === null ? "–" : formatScore(average)}</strong></div>
+      <div><span>Repasos</span><strong>${done.length}</strong></div>
+      <div><span>Dominio</span><strong>${Math.round(topic.mastery)}%</strong></div>
+      <div><span>Próximo</span><strong>${nextReview ? shortDate(new Date(nextReview.dueDate)) : "–"}</strong></div>
+    </div>
+    <section class="detail-block">
+      <div class="chart-head"><h3>Nota en cada repaso</h3><span class="muted">Intervalo actual: ${interval} ${interval === 1 ? "día" : "días"}</span></div>
+      <div class="chart-body" id="topicChart"></div>
+    </section>
+    <label class="hardcore-toggle">
+      <input type="checkbox" id="topicHardcoreToggle" ${topic.hardcore ? "checked" : ""} />
+      <span>🔥 Modo hardcore <small>${topic.hardcore ? `Activado: más repasos y como mucho ${srsConfig.modes.hardcore.maxInterval} días entre ellos.` : "Actívalo para repasar este tema más a menudo (máximo 35 días entre repasos)."}</small></span>
+    </label>
+    <section class="detail-block">
+      <h3>Tus comentarios</h3>
+      <ol class="note-list">
+        ${done.length ? done.slice().reverse().map((review) => `
+          <li class="note-item">
+            <span class="note-score tone-${scoreTone(review.score)}">${formatScore(review.score)}</span>
+            <div>
+              <p class="note-meta">Repaso ${review.step} · ${formatDate(new Date(review.completedAt))} · ${getScoreProfile(review.score).label}</p>
+              <p class="note-text${review.note ? "" : " is-empty"}">${review.note ? escapeHtml(review.note) : "Sin comentario"}</p>
+            </div>
+          </li>
+        `).join("") : `<li class="note-empty">Cuando evalúes un repaso, aquí verás tu nota y lo que escribiste (fallos típicos, qué reforzar…).</li>`}
+      </ol>
+    </section>
+    <button type="button" class="ghost danger delete-topic" id="deleteTopicBtn">🗑️ Borrar tema</button>
+  `;
+
+  els.topicDialogBody.querySelector("#topicHardcoreToggle").addEventListener("change", (event) => setHardcore(topic.id, event.target.checked));
+  els.topicDialogBody.querySelector("#deleteTopicBtn").addEventListener("click", () => deleteTopic(topic.id));
+
+  const chartPoints = done.map((review) => ({
+    label: shortDate(new Date(review.completedAt)),
+    value: review.score,
+    tooltip: `<strong>Repaso ${review.step} · ${formatScore(review.score)}</strong><span>${formatDate(new Date(review.completedAt))}</span>${review.note ? `<em>${escapeHtml(review.note)}</em>` : ""}`,
+  }));
+  drawScoreChart(els.topicDialogBody.querySelector("#topicChart"), chartPoints, {
+    ariaLabel: `Notas de cada repaso de ${topic.title}`,
+    emptyText: "Todavía no hay notas. La gráfica aparecerá tras tu primer repaso.",
   });
 }
 
@@ -1463,17 +1927,26 @@ function renderRewards() {
   });
 }
 
-function renderEmpty(container) {
-  container.append(document.querySelector("#emptyStateTemplate").content.cloneNode(true));
+function renderEmpty(container, message) {
+  const node = document.querySelector("#emptyStateTemplate").content.cloneNode(true);
+  if (message) node.querySelector("strong").textContent = message;
+  container.append(node);
 }
 
 function openReview(item) {
   activeReviewId = item.id;
   els.reviewSubject.textContent = item.topic.subject;
-  els.reviewTitle.textContent = item.topic.title;
+  els.reviewTitle.innerHTML = topicNameHtml(item.topic);
   els.scoreInput.value = 7;
   els.scoreOutput.textContent = "7";
   els.noteInput.value = "";
+  const pastNotes = completedReviewsOf(item.topic).filter((review) => review.note).slice(-3).reverse();
+  els.reviewPastNotes.hidden = !pastNotes.length;
+  els.reviewPastNotes.innerHTML = pastNotes.length
+    ? `<p class="past-notes-title">💬 Lo que anotaste en repasos anteriores</p>${pastNotes.map((review) => `
+        <p class="past-note"><span class="note-score tone-${scoreTone(review.score)}">${formatScore(review.score)}</span><span>${escapeHtml(review.note)}</span></p>
+      `).join("")}`
+    : "";
   els.reviewDialog.showModal();
 }
 
