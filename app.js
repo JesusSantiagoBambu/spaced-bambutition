@@ -1,5 +1,22 @@
 const curveDays = [1, 3, 7, 14, 30, 60, 120];
-const dailyReviewLimit = 3;
+const dailyLimitOptions = [1, 2, 3, 4, 5];
+const defaultDailyLimit = 3;
+const schemaVersion = 2;
+// Motor de repasos inspirado en SM-2 (Anki): cada intervalo se multiplica segun la nota,
+// un fallo reinicia el aprendizaje y el ultimo intervalo se repite indefinidamente.
+const srsConfig = {
+  firstIntervalDays: 1,
+  startingEase: 2.2,
+  minEase: 1.3,
+  maxEase: 3,
+  hardMultiplier: 1.2,
+  easyBonus: 1.15,
+  lapseMemoryFactor: 0.2,
+  modes: {
+    normal: { label: "Normal", maxInterval: 120, intervalModifier: 1 },
+    hardcore: { label: "Hardcore", maxInterval: 35, intervalModifier: 0.65 },
+  },
+};
 const ivyTaskLimit = 6;
 const ivyPointsPerPomodoro = 5;
 const pomodoroDurations = [25, 30, 35, 50];
@@ -9,15 +26,15 @@ const ivyDifficulties = {
   red: { label: "Difícil", emoji: "🔴", className: "red", multiplier: 1.5, weight: 3 },
 };
 const storageKey = "spaced-bambutition-state-v1";
-const backupVersion = 1;
+const backupVersion = 2;
 const topicPanelStateKey = "spaced-bambutition-topic-panel-collapsed";
 const legacyStorageKeys = ["repaso10-state-v7"];
-const skipProfile = { label: "Rescate", factor: 0.5, easeDelta: -0.14, masteryDelta: -6 };
+const skipMasteryDelta = -6;
 const scoreProfiles = [
-  { min: 9, label: "Excelente", factor: 1.35, easeDelta: 0.08, masteryDelta: 12 },
-  { min: 7, label: "Bien fijado", factor: 1.1, easeDelta: 0.03, masteryDelta: 7 },
-  { min: 5, label: "Fragil", factor: 0.78, easeDelta: -0.08, masteryDelta: 1 },
-  { min: 0, label: "Refuerzo", factor: 0.45, easeDelta: -0.16, masteryDelta: -8 },
+  { min: 9, key: "easy", label: "Excelente", easeDelta: 0.1, masteryDelta: 12 },
+  { min: 7, key: "good", label: "Bien fijado", easeDelta: 0, masteryDelta: 7 },
+  { min: 5, key: "hard", label: "Fragil", easeDelta: -0.15, masteryDelta: 1 },
+  { min: 0, key: "again", label: "Refuerzo", easeDelta: -0.2, masteryDelta: -8 },
 ];
 
 const state = loadState();
@@ -70,15 +87,27 @@ const els = {
   installHelp: document.querySelector("#installHelp"),
   installDeviceText: document.querySelector("#installDeviceText"),
   installNowBtn: document.querySelector("#installNowBtn"),
+  dailyLimitSelect: document.querySelector("#dailyLimitSelect"),
+  curveChipsHardcore: document.querySelector("#curveChipsHardcore"),
 };
 
 document.querySelector("#dateInput").valueAsDate = new Date();
 
-curveDays.forEach((day) => {
-  const chip = document.createElement("span");
-  chip.className = "chip";
-  chip.textContent = day === 1 ? "24 horas" : `${day} dias`;
-  els.curveChips.append(chip);
+renderCurveChips(els.curveChips, false);
+renderCurveChips(els.curveChipsHardcore, true);
+
+dailyLimitOptions.forEach((value) => {
+  const option = document.createElement("option");
+  option.value = String(value);
+  option.textContent = String(value);
+  els.dailyLimitSelect.append(option);
+});
+
+els.dailyLimitSelect.addEventListener("change", () => {
+  state.settings.dailyLimit = normalizeDailyLimit(els.dailyLimitSelect.value);
+  balanceUpcomingLoad();
+  saveState();
+  render();
 });
 
 els.topicForm.addEventListener("submit", (event) => {
@@ -94,7 +123,9 @@ els.topicForm.addEventListener("submit", (event) => {
     studiedAt: studiedAt.toISOString(),
     ease: 1,
     mastery: 0,
-    reviews: buildReviews(studiedAt),
+    hardcore: form.get("hardcore") === "on",
+    srs: makeInitialSrs(studiedAt),
+    reviews: buildInitialReviews(studiedAt),
   };
 
   rememberSubject(subject);
@@ -385,17 +416,37 @@ function replaceState(nextState) {
 }
 
 function normalizeState(raw) {
-  const topics = Array.isArray(raw.topics) ? raw.topics.map(normalizeTopic) : [];
+  const settings = normalizeSettings(raw.settings);
+  const revived = [];
+  const topics = Array.isArray(raw.topics) ? raw.topics.map((topic) => normalizeTopic(topic, revived)) : [];
+  if (revived.length) spreadRevivedReviews(topics, revived, settings.dailyLimit);
   return {
+    schemaVersion,
     points: Math.max(0, Number(raw.points) || 0),
     streak: Number(raw.streak) || 0,
     lastCompletedDate: raw.lastCompletedDate || "",
+    settings,
     subjects: normalizeSubjects(raw.subjects, topics),
     topics,
     rewards: Array.isArray(raw.rewards) && raw.rewards.length ? raw.rewards : makeInitialRewards(),
     ivyTasks: Array.isArray(raw.ivyTasks) ? raw.ivyTasks.map(normalizeIvyTask) : [],
     history: Array.isArray(raw.history) ? raw.history : [],
   };
+}
+
+function normalizeSettings(settings) {
+  return {
+    dailyLimit: normalizeDailyLimit(settings?.dailyLimit),
+  };
+}
+
+function normalizeDailyLimit(value) {
+  const limit = Number(value);
+  return dailyLimitOptions.includes(limit) ? limit : defaultDailyLimit;
+}
+
+function dailyLimit() {
+  return state.settings?.dailyLimit || defaultDailyLimit;
 }
 
 function normalizeSubjects(subjects, topics) {
@@ -405,9 +456,9 @@ function normalizeSubjects(subjects, topics) {
     .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
 }
 
-function normalizeTopic(topic) {
+function normalizeTopic(topic, revived = []) {
   const studiedAt = topic.studiedAt || topic.createdAt || new Date().toISOString();
-  return {
+  const normalized = {
     id: topic.id || crypto.randomUUID(),
     subject: topic.subject || "Sin asignatura/oposición",
     title: topic.title || "Tema sin titulo",
@@ -415,20 +466,142 @@ function normalizeTopic(topic) {
     studiedAt,
     ease: clamp(Number(topic.ease) || 1, 0.55, 1.85),
     mastery: clamp(Number(topic.mastery) || 0, 0, 100),
+    hardcore: Boolean(topic.hardcore),
+    srs: null,
     reviews: Array.isArray(topic.reviews)
       ? topic.reviews.map((review, index) => normalizeReview(review, index, studiedAt))
-      : buildReviews(new Date(studiedAt)),
+      : buildInitialReviews(new Date(studiedAt)),
   };
+
+  if (topic.srs && typeof topic.srs === "object") {
+    normalized.srs = normalizeSrs(topic.srs, studiedAt);
+    ensurePendingReview(normalized);
+  } else {
+    migrateLegacyTopic(normalized, revived);
+  }
+  return normalized;
+}
+
+function normalizeSrs(srs, studiedAt) {
+  return {
+    ease: clamp(Number(srs.ease) || srsConfig.startingEase, srsConfig.minEase, srsConfig.maxEase),
+    interval: Math.max(1, Math.round(Number(srs.interval) || srsConfig.firstIntervalDays)),
+    reps: Math.max(0, Number(srs.reps) || 0),
+    lapses: Math.max(0, Number(srs.lapses) || 0),
+    lastReviewedAt: srs.lastReviewedAt || studiedAt,
+    relearning: Boolean(srs.relearning),
+  };
+}
+
+function makeInitialSrs(studiedAt) {
+  return {
+    ease: srsConfig.startingEase,
+    interval: srsConfig.firstIntervalDays,
+    reps: 0,
+    lapses: 0,
+    lastReviewedAt: new Date(studiedAt).toISOString(),
+    relearning: false,
+  };
+}
+
+// Convierte un tema creado con la version anterior (7 repasos fijos) al motor nuevo.
+// Regla de oro: el proximo repaso pendiente conserva su fecha exacta.
+function migrateLegacyTopic(topic, revived) {
+  const completed = topic.reviews
+    .filter((review) => review.completedAt)
+    .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+  const nextPending = topic.reviews
+    .filter((review) => !review.completedAt)
+    .sort((a, b) => a.step - b.step)[0];
+  const lastCompleted = completed[completed.length - 1];
+  const lastReviewedAt = lastCompleted?.completedAt || topic.studiedAt;
+  const previousAnchor = completed.length > 1 ? completed[completed.length - 2].completedAt : topic.studiedAt;
+
+  topic.srs = {
+    ease: legacyEaseToSrs(topic.ease),
+    interval: Math.max(1, dayDistance(lastReviewedAt, previousAnchor)),
+    reps: completed.length,
+    lapses: completed.filter((review) => Number(review.score) < 5).length,
+    lastReviewedAt,
+    relearning: false,
+  };
+
+  if (nextPending) {
+    const gap = Math.max(1, dayDistance(nextPending.dueDate, lastReviewedAt));
+    nextPending.intervalDays = gap;
+    nextPending.baseDay = gap;
+    nextPending.idealDueDate = nextPending.dueDate;
+    topic.srs.interval = gap;
+    topic.reviews = [...completed, nextPending];
+    return;
+  }
+
+  // Tema que la version anterior daba por "completado": vuelve al ciclo.
+  const mode = topicMode(topic);
+  const lastScore = Number(lastCompleted?.score);
+  const gap = lastScore < 5
+    ? 1
+    : clamp(Math.round(topic.srs.interval * topic.srs.ease * mode.intervalModifier), 1, mode.maxInterval);
+  const review = makePendingReview(completed.length + 1, lastReviewedAt, gap);
+  review.adjusted = true;
+  review.adjustmentReason = "El último repaso se repite para no olvidar";
+  topic.srs.interval = gap;
+  topic.reviews = [...completed, review];
+  if (new Date(review.dueDate) < addDays(startOfToday(), 1)) revived.push({ topic, review, score: lastScore });
+}
+
+function legacyEaseToSrs(legacyEase) {
+  const value = Number(legacyEase) || 1;
+  if (value >= 1) return clamp(srsConfig.startingEase + (value - 1) * 0.6, srsConfig.minEase, srsConfig.maxEase);
+  return clamp(srsConfig.startingEase - (1 - value) * 2, srsConfig.minEase, srsConfig.maxEase);
+}
+
+// Los temas "completados" que vuelven a tocar no se acumulan todos hoy:
+// se reparten desde hoy respetando la carga diaria, empezando por los de peor nota.
+function spreadRevivedReviews(topics, revived, limit) {
+  const today = startOfToday();
+  const loads = new Map();
+  topics.forEach((topic) => {
+    const pending = pendingReviewOf(topic);
+    if (!pending || revived.some((item) => item.review === pending)) return;
+    const key = new Date(pending.dueDate) < today ? dateKey(today) : dateKey(pending.dueDate);
+    loads.set(key, (loads.get(key) || 0) + 1);
+  });
+
+  revived
+    .sort((a, b) => (a.score || 0) - (b.score || 0))
+    .forEach(({ review }) => {
+      let date = atReviewTime(today);
+      while ((loads.get(dateKey(date)) || 0) >= limit) date = addDays(date, 1);
+      loads.set(dateKey(date), (loads.get(dateKey(date)) || 0) + 1);
+      review.dueDate = date.toISOString();
+      review.idealDueDate = review.dueDate;
+    });
+}
+
+function ensurePendingReview(topic) {
+  const pending = topic.reviews.filter((review) => !review.completedAt);
+  if (pending.length === 1) return;
+  const completed = topic.reviews.filter((review) => review.completedAt);
+  if (pending.length > 1) {
+    const first = pending.sort((a, b) => a.step - b.step)[0];
+    topic.reviews = [...completed, first];
+    return;
+  }
+  const review = makePendingReview(completed.length + 1, topic.srs.lastReviewedAt, topic.srs.interval);
+  topic.reviews = [...completed, review];
 }
 
 function normalizeReview(review, index, studiedAt) {
   const baseDay = Number(review.baseDay ?? curveDays[index] ?? (index + 1) * 7);
+  const dueDate = review.dueDate || addDays(new Date(studiedAt), baseDay).toISOString();
   return {
     id: review.id || crypto.randomUUID(),
     step: Number(review.step) || index + 1,
     baseDay,
     intervalDays: Number(review.intervalDays) || baseDay,
-    dueDate: review.dueDate || addDays(new Date(studiedAt), baseDay).toISOString(),
+    dueDate,
+    idealDueDate: review.idealDueDate || dueDate,
     completedAt: review.completedAt || "",
     skippedAt: review.skippedAt || "",
     skipCount: Number(review.skipCount) || 0,
@@ -490,14 +663,19 @@ function renderSubjectOptions() {
   });
 }
 
-function buildReviews(studiedAt) {
-  const start = atReviewTime(studiedAt);
-  return curveDays.map((days, index) => ({
+function buildInitialReviews(studiedAt) {
+  return [makePendingReview(1, studiedAt, srsConfig.firstIntervalDays)];
+}
+
+function makePendingReview(step, anchorDate, gap) {
+  const dueDate = addDays(atReviewTime(anchorDate), gap).toISOString();
+  return {
     id: crypto.randomUUID(),
-    step: index + 1,
-    baseDay: days,
-    intervalDays: days,
-    dueDate: addDays(start, days).toISOString(),
+    step,
+    baseDay: gap,
+    intervalDays: gap,
+    dueDate,
+    idealDueDate: dueDate,
     completedAt: "",
     skippedAt: "",
     skipCount: 0,
@@ -506,7 +684,73 @@ function buildReviews(studiedAt) {
     points: 0,
     adjusted: false,
     adjustmentReason: "",
-  }));
+  };
+}
+
+function topicMode(topic) {
+  return topic.hardcore ? srsConfig.modes.hardcore : srsConfig.modes.normal;
+}
+
+function pendingReviewOf(topic) {
+  return topic.reviews.find((review) => !review.completedAt) || null;
+}
+
+// Calcula el siguiente intervalo (en dias) a partir de la nota del repaso.
+// base: intervalo que se acaba de superar; daysLate: dias de retraso al hacerlo.
+function scheduleNext(srs, mode, score, base, daysLate) {
+  const profile = getScoreProfile(score);
+  const next = { ...srs };
+  next.ease = clamp(srs.ease + profile.easeDelta, srsConfig.minEase, srsConfig.maxEase);
+  next.reps = srs.reps + 1;
+
+  if (profile.key === "again") {
+    next.lapses = srs.lapses + 1;
+    next.relearning = true;
+    next.interval = Math.max(1, Math.round(base * srsConfig.lapseMemoryFactor));
+    return { srs: next, gap: 1, profile };
+  }
+
+  let raw;
+  if (profile.key === "easy") raw = (base + daysLate) * next.ease * srsConfig.easyBonus;
+  else if (profile.key === "good") raw = (base + daysLate / 2) * next.ease;
+  else raw = (base + daysLate / 4) * srsConfig.hardMultiplier;
+
+  let gap = Math.max(base + 1, Math.round(raw * mode.intervalModifier));
+  gap = Math.min(gap, mode.maxInterval);
+  next.relearning = false;
+  next.interval = gap;
+  return { srs: next, gap, profile };
+}
+
+// Trayectoria tipica (siempre la misma nota) para mostrar la secuencia en pantalla.
+function projectPath(hardcore, score = 7, steps = 8) {
+  const mode = hardcore ? srsConfig.modes.hardcore : srsConfig.modes.normal;
+  let srs = { ...makeInitialSrs(new Date()), interval: srsConfig.firstIntervalDays };
+  const gaps = [srsConfig.firstIntervalDays];
+  let base = srsConfig.firstIntervalDays;
+  while (gaps.length < steps) {
+    const result = scheduleNext(srs, mode, score, base, 0);
+    srs = result.srs;
+    base = result.gap;
+    gaps.push(result.gap);
+  }
+  return gaps;
+}
+
+function renderCurveChips(container, hardcore) {
+  if (!container) return;
+  container.replaceChildren();
+  const maxInterval = (hardcore ? srsConfig.modes.hardcore : srsConfig.modes.normal).maxInterval;
+  const path = projectPath(hardcore, 7, 14);
+  const capIndex = path.indexOf(maxInterval);
+  const visible = capIndex >= 0 ? path.slice(0, capIndex + 1) : path;
+  visible.forEach((gap, index) => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    if (index === 0) chip.textContent = "24 h";
+    else chip.textContent = gap === maxInterval ? `cada ${gap} d 🔁` : `+${gap} d`;
+    container.append(chip);
+  });
 }
 
 function parseDate(value) {
@@ -586,7 +830,10 @@ function completeReview(reviewId, score, note) {
   const isOnTime = daysLate === 0;
   const latenessPenalty = Math.min(10, daysLate * 2);
   const points = Math.max(4, 10 + Math.round(score * 2) + (isOnTime ? 8 : 0) + streakBonus() - latenessPenalty);
-  const profile = getScoreProfile(score);
+  const scheduledGap = Math.max(1, Number(review.intervalDays) || dayDistance(review.dueDate, topic.srs.lastReviewedAt));
+  const base = topic.srs.relearning ? topic.srs.interval : scheduledGap;
+  const result = scheduleNext(topic.srs, topicMode(topic), score, base, daysLate);
+  const profile = result.profile;
 
   review.completedAt = completedAt.toISOString();
   review.score = score;
@@ -596,8 +843,15 @@ function completeReview(reviewId, score, note) {
   review.adjustmentReason = `${profile.label}: curva adaptada`;
   state.points += points;
 
-  updateTopicMemory(topic, profile);
-  replanFutureReviews(topic, review, { score, anchorDate: completedAt, skipped: false });
+  topic.srs = { ...result.srs, lastReviewedAt: completedAt.toISOString() };
+  topic.mastery = clamp((topic.mastery || 0) + profile.masteryDelta, 0, 100);
+  const nextReview = makePendingReview(review.step + 1, completedAt, result.gap);
+  nextReview.adjusted = true;
+  nextReview.adjustmentReason = profile.key === "again"
+    ? "Refuerzo: se vuelve a repasar mañana"
+    : `${profile.label}: próximo en ${result.gap} ${result.gap === 1 ? "día" : "días"}`;
+  topic.reviews.push(nextReview);
+
   balanceUpcomingLoad();
   updateStreak(completedAt);
   state.history.unshift({
@@ -610,6 +864,8 @@ function completeReview(reviewId, score, note) {
     points,
     daysLate,
     profile: profile.label,
+    nextIntervalDays: result.gap,
+    hardcore: Boolean(topic.hardcore),
     completedAt: completedAt.toISOString(),
   });
 
@@ -631,11 +887,11 @@ function skipReview(reviewId) {
   review.skipCount += 1;
   review.skippedAt = skippedAt.toISOString();
   review.dueDate = rescueDate.toISOString();
+  review.idealDueDate = review.dueDate;
   review.adjusted = true;
   review.adjustmentReason = `Rescate por repaso saltado: -${penalty} puntos`;
+  topic.mastery = clamp((topic.mastery || 0) + skipMasteryDelta, 0, 100);
 
-  updateTopicMemory(topic, skipProfile);
-  replanFutureReviews(topic, review, { score: 3, anchorDate: rescueDate, skipped: true });
   balanceUpcomingLoad();
   state.history.unshift({
     id: crypto.randomUUID(),
@@ -647,6 +903,40 @@ function skipReview(reviewId) {
     skippedAt: skippedAt.toISOString(),
   });
 
+  saveState();
+  render();
+}
+
+function setHardcore(topicId, enabled) {
+  const topic = state.topics.find((item) => item.id === topicId);
+  if (!topic || topic.hardcore === enabled) return;
+  topic.hardcore = enabled;
+
+  const pending = pendingReviewOf(topic);
+  const tomorrow = addDays(startOfToday(), 1);
+  if (pending && !topic.srs.relearning && new Date(pending.dueDate) >= tomorrow) {
+    const hardcore = srsConfig.modes.hardcore;
+    const normal = srsConfig.modes.normal;
+    const gap = Math.max(1, Number(pending.intervalDays) || 1);
+    const newGap = enabled
+      ? Math.max(1, Math.min(hardcore.maxInterval, Math.round(gap * hardcore.intervalModifier)))
+      : Math.min(normal.maxInterval, Math.round(gap / hardcore.intervalModifier));
+    let newDue = addDays(atReviewTime(topic.srs.lastReviewedAt), newGap);
+    if (newDue < tomorrow) newDue = tomorrow;
+    const current = new Date(pending.idealDueDate || pending.dueDate);
+    const shouldMove = enabled ? newDue < current : newDue > current;
+    if (shouldMove) {
+      pending.intervalDays = newGap;
+      pending.baseDay = newGap;
+      pending.dueDate = newDue.toISOString();
+      pending.idealDueDate = pending.dueDate;
+      pending.adjusted = true;
+      pending.adjustmentReason = enabled ? "🔥 Hardcore activado: repaso adelantado" : "Modo normal: repaso reajustado";
+      topic.srs.interval = newGap;
+    }
+  }
+
+  balanceUpcomingLoad();
   saveState();
   render();
 }
@@ -672,10 +962,24 @@ function deleteReward(rewardId) {
   const confirmed = confirm(`¿Borrar la recompensa "${reward.name}"?`);
   if (!confirmed) return;
 
+  if (reward.redeemed) recordRedemption(reward);
   state.rewards = state.rewards.filter((item) => item.id !== rewardId);
   recomputePointsFromHistory();
   saveState();
   render();
+}
+
+// Deja constancia del canje para que borrar la recompensa no devuelva los puntos.
+function recordRedemption(reward) {
+  if (state.history.some((item) => item.type === "redeemed" && item.rewardId === reward.id)) return;
+  state.history.unshift({
+    id: crypto.randomUUID(),
+    type: "redeemed",
+    rewardId: reward.id,
+    reward: reward.name,
+    cost: Number(reward.cost) || 0,
+    redeemedAt: new Date().toISOString(),
+  });
 }
 
 function recomputePointsFromHistory() {
@@ -685,8 +989,12 @@ function recomputePointsFromHistory() {
     if (item.type === "skipped") return sum - (Number(item.penalty) || 0);
     return sum;
   }, 0);
-  const spent = state.rewards.reduce((sum, reward) => sum + (reward.redeemed ? Number(reward.cost) || 0 : 0), 0);
-  state.points = Math.max(0, earned - spent);
+  const redeemedInHistory = new Set(state.history.filter((item) => item.type === "redeemed").map((item) => item.rewardId));
+  const spentHistory = state.history.reduce((sum, item) => sum + (item.type === "redeemed" ? Number(item.cost) || 0 : 0), 0);
+  const spentLegacy = state.rewards.reduce((sum, reward) => (
+    sum + (reward.redeemed && !redeemedInHistory.has(reward.id) ? Number(reward.cost) || 0 : 0)
+  ), 0);
+  state.points = Math.max(0, earned - spentHistory - spentLegacy);
 }
 
 function recomputeStreakFromHistory() {
@@ -719,73 +1027,66 @@ function getScoreProfile(score) {
   return scoreProfiles.find((profile) => score >= profile.min) || scoreProfiles[scoreProfiles.length - 1];
 }
 
-function updateTopicMemory(topic, profile) {
-  topic.ease = clamp((topic.ease || 1) + profile.easeDelta, 0.55, 1.85);
-  topic.mastery = clamp((topic.mastery || 0) + profile.masteryDelta, 0, 100);
-}
-
-function replanFutureReviews(topic, anchorReview, options) {
-  const profile = options.skipped ? skipProfile : getScoreProfile(options.score);
-  const futureReviews = topic.reviews
-    .filter((review) => !review.completedAt && review.step > anchorReview.step)
-    .sort((a, b) => a.step - b.step);
-
-  if (!futureReviews.length) return;
-
-  let dateCursor = atReviewTime(options.anchorDate);
-  let previousBaseDay = anchorReview.baseDay || curveDays[anchorReview.step - 1] || 1;
-
-  futureReviews.forEach((review, index) => {
-    const baseGap = Math.max(1, (review.baseDay || previousBaseDay + 1) - previousBaseDay);
-    let gap = Math.max(1, Math.round(baseGap * profile.factor * (topic.ease || 1)));
-
-    if (options.skipped) gap = Math.max(1, Math.round(baseGap * skipProfile.factor));
-    if (!options.skipped && options.score < 5 && index === 0) gap = 1;
-    if (!options.skipped && options.score >= 9 && index === 0) gap = Math.max(2, gap);
-
-    dateCursor = addDays(dateCursor, gap);
-    review.dueDate = dateCursor.toISOString();
-    review.intervalDays = gap;
-    review.adjusted = true;
-    review.adjustmentReason = options.skipped ? "Reajustado por repaso saltado" : `${profile.label}: curva adaptada`;
-    previousBaseDay = review.baseDay || previousBaseDay + gap;
-  });
-}
-
+// Reparte los repasos futuros sin romper la curva: cada repaso solo puede moverse
+// dentro de un margen proporcional a su intervalo (como el equilibrador de carga de Anki).
+// Los repasos de hoy, los atrasados y los de intervalo corto no se mueven nunca.
 function balanceUpcomingLoad() {
-  const today = startOfToday();
+  const limit = dailyLimit();
+  const tomorrow = addDays(startOfToday(), 1);
   const loads = new Map();
-  const topicLastDate = new Map();
-  const pending = reviewItems()
-    .filter(({ review }) => !review.completedAt && new Date(review.dueDate) >= today)
-    .sort((a, b) => new Date(a.review.dueDate) - new Date(b.review.dueDate) || a.review.step - b.review.step);
+  const movable = [];
 
-  pending.forEach(({ review, topic }) => {
-    let dueDate = atReviewTime(review.dueDate);
-    const previousTopicDate = topicLastDate.get(topic.id);
-    if (previousTopicDate && dueDate <= previousTopicDate) {
-      dueDate = addDays(previousTopicDate, 1);
-    }
-
-    let key = dateKey(dueDate);
-    while ((loads.get(key) || 0) >= dailyReviewLimit) {
-      dueDate = addDays(dueDate, 1);
-      key = dateKey(dueDate);
-    }
-
-    if (dateKey(review.dueDate) !== key) {
-      review.dueDate = dueDate.toISOString();
-      review.adjusted = true;
-      review.adjustmentReason = "Movido para equilibrar carga diaria";
-    }
-
-    loads.set(key, (loads.get(key) || 0) + 1);
-    topicLastDate.set(topic.id, dueDate);
+  state.topics.forEach((topic) => {
+    const review = pendingReviewOf(topic);
+    if (!review) return;
+    const ideal = atReviewTime(review.idealDueDate || review.dueDate);
+    if (ideal < tomorrow) return;
+    movable.push({ topic, review, ideal });
   });
+
+  movable
+    .sort((a, b) => (a.review.intervalDays - b.review.intervalDays) || (a.ideal - b.ideal))
+    .forEach(({ topic, review, ideal }) => {
+      const gap = Math.max(1, Number(review.intervalDays) || 1);
+      const margin = gap <= 2 ? 0 : Math.min(7, Math.max(1, Math.round(gap * 0.1)));
+      const earliest = addDays(atReviewTime(topic.srs.lastReviewedAt), 1);
+      const offsets = [0];
+      for (let step = 1; step <= margin; step += 1) offsets.push(-step, step);
+
+      let chosen = ideal;
+      for (const offset of offsets) {
+        const candidate = addDays(ideal, offset);
+        if (candidate < tomorrow || candidate < earliest) continue;
+        if ((loads.get(dateKey(candidate)) || 0) < limit) {
+          chosen = candidate;
+          break;
+        }
+      }
+
+      const key = dateKey(chosen);
+      loads.set(key, (loads.get(key) || 0) + 1);
+      const moved = key !== dateKey(ideal);
+      const wasMoved = dateKey(review.dueDate) !== dateKey(ideal);
+      review.dueDate = chosen.toISOString();
+      if (moved) {
+        review.adjusted = true;
+        review.adjustmentReason = "Movido para equilibrar carga diaria";
+      } else if (wasMoved && review.adjustmentReason === "Movido para equilibrar carga diaria") {
+        review.adjustmentReason = "";
+      }
+    });
 }
 
 function streakBonus() {
-  return Math.min(10, Math.floor(state.streak / 3) * 2);
+  return Math.min(10, Math.floor(currentStreak() / 3) * 2);
+}
+
+// La racha solo sigue viva si el ultimo repaso fue hoy o ayer.
+function currentStreak() {
+  if (!state.lastCompletedDate) return 0;
+  const today = dateKey(new Date());
+  const yesterday = dateKey(addDays(new Date(), -1));
+  return state.lastCompletedDate === today || state.lastCompletedDate === yesterday ? state.streak : 0;
 }
 
 function updateStreak(date) {
@@ -965,10 +1266,12 @@ function render() {
   const todayLoad = countReviewsOn(new Date());
 
   els.pointsStat.textContent = state.points;
-  els.streakStat.textContent = `${state.streak} ${state.streak === 1 ? "dia" : "dias"}`;
+  const streak = currentStreak();
+  els.streakStat.textContent = `${streak} ${streak === 1 ? "dia" : "dias"}`;
   els.levelStat.textContent = Math.floor(state.points / 250) + 1;
   els.todayStat.textContent = `${due.length} ${due.length === 1 ? "repaso" : "repasos"}`;
-  els.loadStat.textContent = `${todayLoad}/${dailyReviewLimit}`;
+  els.loadStat.textContent = `${todayLoad}/`;
+  els.dailyLimitSelect.value = String(dailyLimit());
   els.dueCount.textContent = `${due.length} pendientes`;
   els.ivyCount.textContent = `${completedIvyTasks.length}/${ivyTasks.length || ivyTaskLimit} tareas`;
   els.averageScore.textContent = completed.length ? `Media ${average.toFixed(1)}/10` : "Sin notas";
@@ -995,7 +1298,7 @@ function renderDueList(items) {
     card.className = `review-card${overdue ? " overdue" : ""}`;
     card.innerHTML = `
       <div>
-        <span class="badge ${overdue ? "warning" : "brand"}">${overdue ? `⚠️ Atrasado ${daysLate}d` : "✅ Toca hoy"} · Repaso ${item.step}</span>
+        <span class="badge ${overdue ? "warning" : "brand"}">${overdue ? `⚠️ Atrasado ${daysLate}d` : "✅ Toca hoy"} · Repaso ${item.step}${item.topic.hardcore ? " · 🔥" : ""}</span>
         <p class="card-title">📘 ${escapeHtml(item.topic.title)}</p>
         <p class="card-meta">${escapeHtml(item.topic.subject)} · ${formatDate(dueDate)}</p>
         ${item.adjustmentReason ? `<p class="card-note">${escapeHtml(item.adjustmentReason)}</p>` : ""}
@@ -1082,10 +1385,10 @@ function renderCalendar() {
       <div class="date-pill">🗓️ ${shortDate(dueDate)}</div>
       <div>
         <p class="card-title">📘 ${escapeHtml(item.topic.title)}</p>
-        <p class="card-meta">${escapeHtml(item.topic.subject)} · carga ${countReviewsOn(dueDate)}/${dailyReviewLimit}</p>
+        <p class="card-meta">${escapeHtml(item.topic.subject)} · carga ${countReviewsOn(dueDate)}/${dailyLimit()}</p>
         ${item.adjustmentReason ? `<p class="card-note">${escapeHtml(item.adjustmentReason)}</p>` : ""}
       </div>
-      <span class="badge ${item.adjusted ? "brand" : ""}">${item.adjusted ? "🧠 Adaptado" : `Repaso ${item.step}`}</span>
+      <span class="badge ${item.topic.hardcore ? "hardcore" : item.adjusted ? "brand" : ""}">${item.topic.hardcore ? "🔥 Hardcore" : item.adjusted ? "🧠 Adaptado" : `Repaso ${item.step}`}</span>
     `;
     els.calendarList.append(row);
   });
@@ -1098,14 +1401,15 @@ function renderProgress() {
   state.topics.forEach((topic) => {
     const done = topic.reviews.filter((review) => review.completedAt);
     const average = done.length ? done.reduce((sum, review) => sum + review.score, 0) / done.length : 0;
-    const nextReview = topic.reviews.find((review) => !review.completedAt);
+    const nextReview = pendingReviewOf(topic);
+    const interval = topic.srs?.interval || 1;
     const card = document.createElement("article");
-    card.className = "topic-card";
+    card.className = `topic-card${topic.hardcore ? " is-hardcore" : ""}`;
     card.innerHTML = `
       <div class="topic-card-head">
         <div>
           <p class="card-title">📘 ${escapeHtml(topic.title)}</p>
-          <p class="card-meta">${escapeHtml(topic.subject)} · ${done.length}/${topic.reviews.length} repasos · factor x${topic.ease.toFixed(2)}</p>
+          <p class="card-meta">${escapeHtml(topic.subject)} · ${done.length} ${done.length === 1 ? "repaso hecho" : "repasos hechos"} · intervalo ${interval} ${interval === 1 ? "día" : "días"}</p>
         </div>
         <button class="ghost danger delete-topic" type="button" aria-label="Borrar ${escapeHtml(topic.title)}">🗑️ Borrar</button>
       </div>
@@ -1115,10 +1419,15 @@ function renderProgress() {
       <div class="topic-metrics">
         <strong>${done.length ? average.toFixed(1) : "-"} / 10</strong>
         <span class="badge brand">🧠 Dominio ${Math.round(topic.mastery)}%</span>
-        <span class="badge">${nextReview ? `⏭️ Proximo ${shortDate(new Date(nextReview.dueDate))}` : "✅ Completado"}</span>
+        <span class="badge">${nextReview ? `⏭️ Próximo ${shortDate(new Date(nextReview.dueDate))}` : "✅ Al día"}</span>
       </div>
+      <label class="hardcore-toggle">
+        <input type="checkbox" ${topic.hardcore ? "checked" : ""} />
+        <span>🔥 Modo hardcore <small>${topic.hardcore ? `más repasos, máximo ${srsConfig.modes.hardcore.maxInterval} días` : "desactivado"}</small></span>
+      </label>
     `;
     card.querySelector(".delete-topic").addEventListener("click", () => deleteTopic(topic.id));
+    card.querySelector(".hardcore-toggle input").addEventListener("change", (event) => setHardcore(topic.id, event.target.checked));
     els.progressList.append(card);
   });
 }
@@ -1145,6 +1454,7 @@ function renderRewards() {
     card.querySelector(".redeem-reward").addEventListener("click", () => {
       if (!canRedeem) return;
       reward.redeemed = true;
+      recordRedemption(reward);
       recomputePointsFromHistory();
       saveState();
       render();

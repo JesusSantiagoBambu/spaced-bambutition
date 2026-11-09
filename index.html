@@ -193,6 +193,10 @@
                 </div>
                 <input id="dateInput" name="firstDate" type="date" required />
               </div>
+              <label class="hardcore-toggle form-toggle">
+                <input id="hardcoreInput" name="hardcore" type="checkbox" />
+                <span>🔥 Modo hardcore <small>Más repasos y como mucho 35 días entre ellos. Puedes cambiarlo luego en Progreso.</small></span>
+              </label>
               <button class="primary" type="submit">➕ Crear plan</button>
             </form>
 
@@ -201,10 +205,13 @@
                 🧠 Secuencia
                 <span class="help-wrap">
                   <button class="help-btn" type="button" aria-label="Ayuda: secuencia">?</button>
-                  <span class="help-popover" role="tooltip">Es el plan base. Luego se acerca o se separa según la nota de cada repaso.</span>
+                  <span class="help-popover" role="tooltip">Ejemplo sacando siempre un 7. Cada nota alarga o acorta el siguiente intervalo: con 9 o más se separa más, por debajo de 5 se vuelve a repasar al día siguiente. El último intervalo se repite siempre para no olvidar.</span>
                 </span>
               </h3>
+              <p class="curve-label">Normal</p>
               <div class="chips" id="curveChips"></div>
+              <p class="curve-label">🔥 Hardcore</p>
+              <div class="chips" id="curveChipsHardcore"></div>
             </div>
           </div>
         </aside>
@@ -226,7 +233,7 @@
             🔥 Racha
             <span class="help-wrap">
               <button class="help-btn" type="button" aria-label="Ayuda: racha">?</button>
-              <span class="help-popover" role="tooltip">Cuenta los días seguidos en los que se completa al menos un repaso.</span>
+              <span class="help-popover" role="tooltip">Cuenta los días seguidos en los que se completa al menos un repaso. Si pasa un día entero sin repasar, vuelve a 0.</span>
             </span>
           </span>
           <strong id="streakStat">0 dias</strong>
@@ -256,10 +263,10 @@
             ⚖️ Carga
             <span class="help-wrap">
               <button class="help-btn" type="button" aria-label="Ayuda: carga">?</button>
-              <span class="help-popover" role="tooltip">Indica cuántos repasos hay programados hoy sobre el máximo recomendado de 3.</span>
+              <span class="help-popover" role="tooltip">Repasos programados hoy sobre tu máximo diario. Elige de 1 a 5 (recomendado: 3). La app reparte los repasos futuros moviéndolos solo unos días para no romper la curva, así que algún día puede pasarse un poco.</span>
             </span>
           </span>
-          <strong id="loadStat">0/3</strong>
+          <strong class="load-value"><span id="loadStat">0/</span><select id="dailyLimitSelect" aria-label="Máximo de repasos al día"></select></strong>
         </div>
       </section>
     </main>

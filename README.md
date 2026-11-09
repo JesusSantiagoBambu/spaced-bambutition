@@ -32,10 +32,15 @@ Cuando cambies archivos cacheados, sube tambien la version de `cacheName` en `sw
 
 ## Que incluye
 
-- Plan base a 1, 3, 7, 14, 30, 60 y 120 dias desde la fecha de estudio.
-- Reprogramacion adaptativa: notas altas espacian mas los siguientes repasos y notas bajas los acercan.
-- Accion de repaso saltado: resta pocos puntos, mueve el repaso a recuperacion y recalcula los siguientes.
-- Equilibrado de carga diaria para evitar mas de 3 repasos en el mismo dia.
+- Motor de repasos inspirado en SM-2 (el algoritmo clasico de Anki), adaptado a notas de 0 a 10:
+  - Primer repaso a las 24 horas; despues cada intervalo se multiplica por el factor de facilidad del tema.
+  - Nota 9-10 (Excelente) alarga mas el intervalo; 7-8,5 (Bien fijado) lo multiplica por el factor; 5-6,5 (Fragil) solo lo alarga x1,2; menos de 5 (Refuerzo) vuelve a repasarse al dia siguiente y el tema reaprende desde un intervalo corto.
+  - Si un repaso se hace tarde y sale bien, se tiene en cuenta ese retraso al calcular el siguiente.
+  - Los temas nunca se dan por terminados: el ultimo intervalo (120 dias en modo normal) se repite siempre.
+- Modo hardcore por tema (se activa y desactiva en cualquier momento): intervalos un 35% mas cortos y como maximo 35 dias.
+- Accion de repaso saltado: resta pocos puntos y mueve el repaso a recuperacion al dia siguiente.
+- Carga diaria elegible por el alumno (1 a 5 repasos, por defecto 3). El equilibrado solo mueve cada repaso unos dias (alrededor del 10% de su intervalo) para no romper la curva; los repasos de 1-2 dias nunca se mueven.
+- Migracion automatica de los datos de la version anterior: el proximo repaso de cada tema conserva su fecha; los temas que antes se daban por completados vuelven al ciclo repartidos segun la carga diaria.
 - Metodo Ivy Lee en la vista de hoy: hasta 6 tareas diarias con pomodoros y puntos al completarlas.
 - Duracion configurable por pomodoro: 25, 30, 35 o 50 minutos.
 - Dificultad tipo semaforo para cada tarea Ivy Lee: verde, amarillo o rojo.
@@ -43,17 +48,17 @@ Cuando cambies archivos cacheados, sube tambien la version de `cacheName` en `sw
 - Las tareas Ivy Lee completadas desaparecen automaticamente al cambiar de dia, manteniendo sus puntos y estadisticas.
 - Registro de nota por repaso, comentario opcional y media por tema.
 - Puntos por completar repasos, bonus por buena nota y bonus por puntualidad.
-- Racha diaria y niveles por puntos acumulados.
+- Racha diaria (vuelve a 0 si pasa un dia sin repasar) y niveles por puntos acumulados.
 - Recompensas configurables por el propio estudiante.
 - Notificaciones del navegador mientras la app esta abierta y el permiso esta activo.
 - Copias de seguridad en JSON para exportar e importar los datos del alumno.
 - PWA instalable en movil/tablet cuando se publica en HTTPS, con icono y cache offline basico.
-- Look pixel-art inspirado en consolas clasicas, manteniendo el color principal de marca `#09A5BC`.
+- Look pixel-art inspirado en consolas clasicas, manteniendo el color principal de marca `#09A5BC`. Tipografia pixelada solo en el titulo; el resto en Poppins para que se lea mejor.
 - Ayudas contextuales con botones `?` para explicar cada bloque importante.
 - Borrado de temarios desde la vista de progreso cuando se han creado por error.
 - Pantalla ordenada con los repasos de hoy como primer bloque util en movil y tablet.
 - Asignaturas/oposiciones reutilizables: al crear un temario, se guardan para poder elegirlas despues desde el desplegable.
-- Recompensas borrables y canjeables con puntos.
+- Recompensas borrables y canjeables con puntos (borrar una recompensa ya canjeada no devuelve los puntos).
 
 ## Nota
 
