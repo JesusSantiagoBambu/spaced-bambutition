@@ -2,8 +2,8 @@
 // Si url o key estan vacios, la nube queda desactivada y la app funciona solo en local.
 (function () {
   const config = {
-    url: "",
-    key: "",
+    url: "https://tfcevuazvniujzpsmqfb.supabase.co",
+    key: "sb_publishable_Evf2YCQUCfXZ-R0VCkRPzw_FOQhbo23",
   };
 
   const SESSION_KEY = "spaced-bambutition-auth";
