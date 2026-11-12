@@ -260,3 +260,7 @@
     grid-column: 1 / -1;
   }
 }
+
+.teacher-login form[hidden] {
+  display: none;
+}
