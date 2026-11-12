@@ -20,6 +20,10 @@
     <header class="topbar">
       <h1>Spaced Bambutition</h1>
       <div class="top-actions">
+        <button class="icon-btn cloud-btn" id="cloudBtn" type="button" title="Tu cuenta y copia en la nube" aria-label="Tu cuenta y copia en la nube" hidden>
+          <span aria-hidden="true">☁️</span>
+          <span class="cloud-dot" id="cloudDot" aria-hidden="true"></span>
+        </button>
         <button class="icon-btn" id="notifyBtn" title="Activar notificaciones" aria-label="Activar notificaciones">
           <span aria-hidden="true">🔔</span>
         </button>
@@ -44,6 +48,17 @@
     </header>
 
     <main class="app-shell">
+      <section class="cloud-banner" id="cloudBanner" hidden>
+        <span class="cloud-banner-icon" aria-hidden="true">☁️</span>
+        <div class="cloud-banner-text">
+          <strong>Guarda tu progreso en la nube</strong>
+          <span>Entra con tu correo y no perderás nada aunque cambies de móvil o se borren los datos del navegador. Es opcional.</span>
+        </div>
+        <div class="cloud-banner-actions">
+          <button class="primary" id="cloudBannerBtn" type="button">Entrar con mi correo</button>
+          <button class="ghost" id="cloudBannerClose" type="button">Ahora no</button>
+        </div>
+      </section>
       <section class="summary-band" aria-label="Resumen">
         <div class="stat">
           <span class="stat-label label-row">
@@ -276,12 +291,92 @@
       </div>
     </dialog>
 
+    <dialog id="cloudDialog" class="cloud-dialog">
+      <div class="dialog-body">
+        <div class="dialog-head">
+          <div>
+            <p class="dialog-kicker">Tu cuenta</p>
+            <h2 id="cloudDialogTitle">Guarda tu progreso en la nube</h2>
+          </div>
+          <button type="button" class="icon-btn" id="closeCloudDialog" aria-label="Cerrar">✕</button>
+        </div>
+
+        <form id="cloudEmailForm" class="stack cloud-step">
+          <p class="cloud-copy">Te enviaremos un código a tu correo para entrar. No necesitas contraseña. Tus temas, notas y repasos se guardarán en la nube y podrás recuperarlos en cualquier dispositivo.</p>
+          <label class="field-label" for="cloudEmailInput">Correo electrónico</label>
+          <input id="cloudEmailInput" type="email" autocomplete="email" inputmode="email" required placeholder="tu@correo.com" />
+          <p class="cloud-privacy">Tu profesor podrá ver tus temas, notas, comentarios y repasos para poder ayudarte. Puedes seguir usando la app sin cuenta si lo prefieres.</p>
+          <button class="primary" type="submit" id="cloudSendBtn">Enviarme el código</button>
+        </form>
+
+        <form id="cloudCodeForm" class="stack cloud-step" hidden>
+          <p class="cloud-copy">Hemos enviado un código a <strong id="cloudEmailEcho"></strong>. Puede tardar un minuto; mira también en spam.</p>
+          <label class="field-label" for="cloudCodeInput">Código</label>
+          <input id="cloudCodeInput" class="code-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,8}" maxlength="8" required placeholder="123456" />
+          <button class="primary" type="submit" id="cloudVerifyBtn">Entrar</button>
+          <div class="cloud-links">
+            <button class="link-btn" type="button" id="cloudResendBtn">Reenviar código</button>
+            <button class="link-btn" type="button" id="cloudChangeEmailBtn">Cambiar correo</button>
+          </div>
+        </form>
+
+        <form id="cloudNameForm" class="stack cloud-step" hidden>
+          <p class="cloud-copy">¡Listo! Ya se está guardando tu progreso. ¿Cómo te llamas? Así tu profesor sabrá quién eres.</p>
+          <label class="field-label" for="cloudNameInput">Tu nombre</label>
+          <input id="cloudNameInput" autocomplete="name" maxlength="60" placeholder="Nombre y apellido" />
+          <button class="primary" type="submit">Guardar nombre</button>
+          <button class="ghost" type="button" id="cloudSkipNameBtn">Ahora no</button>
+        </form>
+
+        <div id="cloudAccount" class="stack cloud-step" hidden>
+          <div class="cloud-account-card">
+            <span class="cloud-status-pill" id="cloudStatusPill">Guardado</span>
+            <p class="cloud-account-email" id="cloudAccountEmail"></p>
+            <p class="cloud-copy" id="cloudStatusText"></p>
+          </div>
+          <form id="cloudRenameForm" class="cloud-rename">
+            <label class="field-label" for="cloudRenameInput">Tu nombre (lo ve tu profesor)</label>
+            <div class="cloud-rename-row">
+              <input id="cloudRenameInput" maxlength="60" placeholder="Nombre y apellido" />
+              <button class="ghost" type="submit">Guardar</button>
+            </div>
+          </form>
+          <button class="primary" type="button" id="cloudSyncBtn">Sincronizar ahora</button>
+          <button class="ghost danger" type="button" id="cloudSignOutBtn">Cerrar sesión</button>
+          <p class="cloud-privacy">Al cerrar sesión tus datos siguen en este dispositivo y en la nube.</p>
+        </div>
+
+        <p class="cloud-error" id="cloudError" role="alert" hidden></p>
+      </div>
+    </dialog>
+
+    <dialog id="conflictDialog">
+      <div class="dialog-body">
+        <div>
+          <p class="dialog-kicker">Tienes datos en dos sitios</p>
+          <h2>¿Con qué datos te quedas?</h2>
+        </div>
+        <p class="cloud-copy">En este dispositivo hay datos distintos de los que tienes guardados en la nube. Elige cuáles quieres conservar; los otros se sustituirán.</p>
+        <div class="conflict-options">
+          <button type="button" class="conflict-option" id="conflictRemoteBtn">
+            <strong>☁️ Los de la nube</strong>
+            <span id="conflictRemoteText"></span>
+          </button>
+          <button type="button" class="conflict-option" id="conflictLocalBtn">
+            <strong>📱 Los de este dispositivo</strong>
+            <span id="conflictLocalText"></span>
+          </button>
+        </div>
+      </div>
+    </dialog>
+
     <template id="emptyStateTemplate">
       <div class="empty-state">
         <strong>✨ Todo en orden.</strong>
       </div>
     </template>
 
+    <script src="cloud.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

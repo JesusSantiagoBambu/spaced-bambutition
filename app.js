@@ -270,6 +270,7 @@ setTopicPanelCollapsed(localStorage.getItem(topicPanelStateKey) === "true");
 setupHelpPopovers();
 renderInstallHelp();
 render();
+setupCloud();
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
@@ -659,7 +660,14 @@ function normalizePomodoroDuration(value) {
 }
 
 function saveState() {
-  localStorage.setItem(storageKey, JSON.stringify(state));
+  saveLocalState();
+  window.BambuCloud?.sync.markDirty();
+}
+
+function saveLocalState() {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  } catch {}
 }
 
 function rememberSubject(subject) {
@@ -1799,4 +1807,258 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#039;",
   })[char]);
+}
+
+// ---------- Cuenta y copia en la nube ----------
+
+const cloudBannerKey = "spaced-bambutition-cloud-banner-dismissed";
+let cloudEmail = "";
+let conflictResolver = null;
+
+function setupCloud() {
+  const cloud = window.BambuCloud;
+  if (!cloud?.auth.enabled) return;
+  const $ = (selector) => document.querySelector(selector);
+  const ui = {
+    btn: $("#cloudBtn"),
+    dot: $("#cloudDot"),
+    banner: $("#cloudBanner"),
+    dialog: $("#cloudDialog"),
+    title: $("#cloudDialogTitle"),
+    emailForm: $("#cloudEmailForm"),
+    emailInput: $("#cloudEmailInput"),
+    codeForm: $("#cloudCodeForm"),
+    codeInput: $("#cloudCodeInput"),
+    emailEcho: $("#cloudEmailEcho"),
+    nameForm: $("#cloudNameForm"),
+    nameInput: $("#cloudNameInput"),
+    account: $("#cloudAccount"),
+    accountEmail: $("#cloudAccountEmail"),
+    statusPill: $("#cloudStatusPill"),
+    statusText: $("#cloudStatusText"),
+    renameForm: $("#cloudRenameForm"),
+    renameInput: $("#cloudRenameInput"),
+    error: $("#cloudError"),
+    conflict: $("#conflictDialog"),
+  };
+
+  ui.btn.hidden = false;
+
+  const showStep = (step) => {
+    ["emailForm", "codeForm", "nameForm", "account"].forEach((key) => {
+      ui[key].hidden = key !== step;
+    });
+    ui.error.hidden = true;
+    ui.title.textContent = step === "account" ? "Tu copia en la nube" : step === "nameForm" ? "Cuenta creada" : "Guarda tu progreso en la nube";
+  };
+
+  const showError = (message) => {
+    ui.error.textContent = message;
+    ui.error.hidden = false;
+  };
+
+  const busy = (button, isBusy, label) => {
+    if (!button) return;
+    if (isBusy) {
+      button.dataset.label = button.textContent;
+      button.textContent = label;
+      button.disabled = true;
+    } else {
+      button.textContent = button.dataset.label || button.textContent;
+      button.disabled = false;
+    }
+  };
+
+  const refreshBanner = () => {
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(cloudBannerKey) === "1"; } catch {}
+    ui.banner.hidden = Boolean(cloud.auth.user()) || dismissed;
+  };
+
+  const renderAccount = async () => {
+    const user = cloud.auth.user();
+    if (!user) return;
+    ui.accountEmail.textContent = user.email || "";
+    renderCloudStatus(cloud.sync.status());
+    try {
+      const profile = await cloud.auth.getProfile();
+      ui.renameInput.value = profile?.display_name || "";
+    } catch {}
+  };
+
+  const openDialog = () => {
+    if (cloud.auth.user()) {
+      showStep("account");
+      renderAccount();
+    } else {
+      showStep(cloudEmail ? "codeForm" : "emailForm");
+      ui.emailInput.value = cloudEmail;
+    }
+    if (!ui.dialog.open) ui.dialog.showModal();
+  };
+
+  function renderCloudStatus(status) {
+    const labels = {
+      disabled: ["", ""],
+      "signed-out": ["off", "Sin copia en la nube"],
+      idle: ["pending", "Conectando…"],
+      pending: ["pending", "Cambios pendientes de guardar"],
+      syncing: ["pending", "Guardando…"],
+      synced: ["ok", "Guardado en la nube"],
+      offline: ["warn", "Sin conexión: se guardará al volver internet"],
+      error: ["warn", "No se ha podido guardar"],
+    };
+    const [tone, label] = labels[status.state] || labels.idle;
+    ui.dot.dataset.tone = tone;
+    ui.btn.title = label || "Tu cuenta y copia en la nube";
+    ui.statusPill.textContent = label;
+    ui.statusPill.dataset.tone = tone;
+    const last = status.lastSyncAt ? new Date(status.lastSyncAt) : null;
+    ui.statusText.textContent = status.state === "error"
+      ? `${status.message || "Error al conectar"}. Lo volveremos a intentar automáticamente.`
+      : last
+        ? `Última copia: ${new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short" }).format(last)}`
+        : "Aún no se ha hecho ninguna copia.";
+    refreshBanner();
+  }
+
+  ui.btn.addEventListener("click", openDialog);
+  $("#cloudBannerBtn").addEventListener("click", openDialog);
+  $("#cloudBannerClose").addEventListener("click", () => {
+    try { localStorage.setItem(cloudBannerKey, "1"); } catch {}
+    refreshBanner();
+  });
+  $("#closeCloudDialog").addEventListener("click", () => ui.dialog.close());
+  ui.dialog.addEventListener("click", (event) => {
+    if (event.target === ui.dialog) ui.dialog.close();
+  });
+
+  ui.emailForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = ui.emailInput.value.trim().toLowerCase();
+    if (!email) return;
+    const button = $("#cloudSendBtn");
+    busy(button, true, "Enviando…");
+    try {
+      await cloud.auth.sendCode(email);
+      cloudEmail = email;
+      ui.emailEcho.textContent = email;
+      ui.codeInput.value = "";
+      showStep("codeForm");
+      ui.codeInput.focus();
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      busy(button, false);
+    }
+  });
+
+  ui.codeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const code = ui.codeInput.value.replace(/\D/g, "");
+    if (code.length < 6) return showError("Escribe el código completo que te ha llegado.");
+    const button = $("#cloudVerifyBtn");
+    busy(button, true, "Comprobando…");
+    try {
+      await cloud.auth.verifyCode(cloudEmail, code);
+      cloudEmail = "";
+      await cloud.sync.afterSignIn();
+      if (!ui.dialog.open) ui.dialog.showModal();
+      const profile = await cloud.auth.getProfile().catch(() => null);
+      if (profile?.display_name) {
+        showStep("account");
+        renderAccount();
+      } else {
+        showStep("nameForm");
+        ui.nameInput.focus();
+      }
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      busy(button, false);
+    }
+  });
+
+  $("#cloudResendBtn").addEventListener("click", async () => {
+    try {
+      await cloud.auth.sendCode(cloudEmail);
+      showError("Te hemos enviado un código nuevo.");
+    } catch (error) {
+      showError(error.message);
+    }
+  });
+
+  $("#cloudChangeEmailBtn").addEventListener("click", () => {
+    cloudEmail = "";
+    showStep("emailForm");
+    ui.emailInput.focus();
+  });
+
+  ui.nameForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = ui.nameInput.value.trim();
+    try {
+      if (name) await cloud.auth.updateName(name);
+    } catch {}
+    showStep("account");
+    renderAccount();
+  });
+
+  $("#cloudSkipNameBtn").addEventListener("click", () => {
+    showStep("account");
+    renderAccount();
+  });
+
+  ui.renameForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await cloud.auth.updateName(ui.renameInput.value.trim());
+      showError("Nombre guardado.");
+    } catch (error) {
+      showError(error.message);
+    }
+  });
+
+  $("#cloudSyncBtn").addEventListener("click", () => cloud.sync.syncNow());
+
+  $("#cloudSignOutBtn").addEventListener("click", async () => {
+    await cloud.auth.signOut();
+    showStep("emailForm");
+    renderCloudStatus(cloud.sync.status());
+  });
+
+  const describe = (summary) => {
+    const date = summary.changedAt || summary.lastActivity;
+    const when = date ? new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short" }).format(new Date(date)) : "sin fecha";
+    return `${summary.topics} ${summary.topics === 1 ? "tema" : "temas"} · ${summary.reviews} ${summary.reviews === 1 ? "repaso hecho" : "repasos hechos"} · ${summary.points} puntos · último cambio ${when}`;
+  };
+
+  const resolveConflict = (choice) => {
+    ui.conflict.close();
+    conflictResolver?.(choice);
+    conflictResolver = null;
+  };
+  $("#conflictRemoteBtn").addEventListener("click", () => resolveConflict("remote"));
+  $("#conflictLocalBtn").addEventListener("click", () => resolveConflict("local"));
+  ui.conflict.addEventListener("cancel", (event) => event.preventDefault());
+
+  cloud.sync.init({
+    getState: () => state,
+    applyRemote: (remoteState) => {
+      replaceState(normalizeState(remoteState));
+      cleanupOldCompletedIvyTasks();
+      saveLocalState();
+      render();
+    },
+    onStatus: renderCloudStatus,
+    onConflict: ({ local, remote }) => new Promise((resolve) => {
+      conflictResolver = resolve;
+      $("#conflictRemoteText").textContent = describe(remote);
+      $("#conflictLocalText").textContent = describe(local);
+      if (ui.dialog.open) ui.dialog.close();
+      ui.conflict.showModal();
+    }),
+  });
+
+  renderCloudStatus(cloud.sync.status());
 }
