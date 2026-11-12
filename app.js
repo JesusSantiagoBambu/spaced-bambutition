@@ -436,6 +436,7 @@ function replaceState(nextState) {
 
 function normalizeState(raw) {
   const settings = normalizeSettings(raw.settings);
+  const history = Array.isArray(raw.history) ? raw.history.slice() : [];
   const revived = [];
   const topics = Array.isArray(raw.topics) ? raw.topics.map((topic) => normalizeTopic(topic, revived)) : [];
   if (revived.length) spreadRevivedReviews(topics, revived, settings.dailyLimit);
@@ -447,10 +448,34 @@ function normalizeState(raw) {
     settings,
     subjects: normalizeSubjects(raw.subjects, topics),
     topics,
-    rewards: Array.isArray(raw.rewards) && raw.rewards.length ? raw.rewards : makeInitialRewards(),
+    rewards: normalizeRewards(raw.rewards, history),
     ivyTasks: Array.isArray(raw.ivyTasks) ? raw.ivyTasks.map(normalizeIvyTask) : [],
-    history: Array.isArray(raw.history) ? raw.history : [],
+    history,
   };
+}
+
+// Las recompensas se pueden canjear muchas veces: cada canje queda en el historial.
+// Las que la version anterior marcaba como "canjeada" pasan a tener su canje en el historial.
+function normalizeRewards(rewards, history) {
+  const list = Array.isArray(rewards) && rewards.length ? rewards : makeInitialRewards();
+  return list.map((reward) => {
+    const normalized = { ...reward, id: reward.id || crypto.randomUUID(), cost: Number(reward.cost) || 0 };
+    if (normalized.redeemed) {
+      const logged = history.some((item) => item.type === "redeemed" && item.rewardId === normalized.id);
+      if (!logged) {
+        history.push({
+          id: crypto.randomUUID(),
+          type: "redeemed",
+          rewardId: normalized.id,
+          reward: normalized.name,
+          cost: normalized.cost,
+          redeemedAt: "",
+        });
+      }
+    }
+    normalized.redeemed = false;
+    return normalized;
+  });
 }
 
 function normalizeSettings(settings) {
@@ -957,16 +982,14 @@ function deleteReward(rewardId) {
   const confirmed = confirm(`¿Borrar la recompensa "${reward.name}"?`);
   if (!confirmed) return;
 
-  if (reward.redeemed) recordRedemption(reward);
   state.rewards = state.rewards.filter((item) => item.id !== rewardId);
   recomputePointsFromHistory();
   saveState();
   render();
 }
 
-// Deja constancia del canje para que borrar la recompensa no devuelva los puntos.
+// Cada canje queda en el historial: asi se puede repetir y borrar la recompensa no devuelve puntos.
 function recordRedemption(reward) {
-  if (state.history.some((item) => item.type === "redeemed" && item.rewardId === reward.id)) return;
   state.history.unshift({
     id: crypto.randomUUID(),
     type: "redeemed",
@@ -1727,13 +1750,15 @@ function renderRewards() {
   if (!state.rewards.length) return renderEmpty(els.rewardList);
 
   state.rewards.forEach((reward) => {
-    const canRedeem = state.points >= reward.cost && !reward.redeemed;
+    const canRedeem = state.points >= reward.cost;
+    const times = state.history.filter((item) => item.type === "redeemed" && item.rewardId === reward.id).length;
+    const missing = Math.max(0, reward.cost - state.points);
     const card = document.createElement("article");
     card.className = "reward-card";
     card.innerHTML = `
       <div>
         <p class="card-title">${escapeHtml(reward.name)}</p>
-        <p class="card-meta">${reward.redeemed ? "Canjeada" : `${reward.cost} puntos`}</p>
+        <p class="card-meta">${reward.cost} puntos${times ? ` · canjeada ${times} ${times === 1 ? "vez" : "veces"}` : ""}${missing ? ` · te faltan ${missing}` : ""}</p>
       </div>
       <div class="reward-actions">
         <button class="ghost danger delete-reward" type="button">🗑️ Borrar</button>
@@ -1743,9 +1768,9 @@ function renderRewards() {
     card.querySelector(".delete-reward").addEventListener("click", () => deleteReward(reward.id));
     card.querySelector(".redeem-reward").addEventListener("click", () => {
       if (!canRedeem) return;
-      reward.redeemed = true;
+      if (!confirm(`¿Canjear "${reward.name}" por ${reward.cost} puntos?`)) return;
       recordRedemption(reward);
-      recomputePointsFromHistory();
+      state.points = Math.max(0, state.points - reward.cost);
       saveState();
       render();
     });

@@ -61,7 +61,7 @@ Cuando cambies archivos cacheados, sube tambien la version de `cacheName` en `sw
 - Borrado de temarios desde la vista de progreso cuando se han creado por error.
 - Pantalla ordenada con los repasos de hoy como primer bloque util en movil y tablet.
 - Asignaturas/oposiciones reutilizables: al crear un temario, se guardan para poder elegirlas despues desde el desplegable.
-- Recompensas borrables y canjeables con puntos (borrar una recompensa ya canjeada no devuelve los puntos).
+- Recompensas que se pueden canjear tantas veces como se quiera mientras haya puntos (cada canje queda registrado; borrar una recompensa no devuelve los puntos gastados).
 
 ## Nota
 
