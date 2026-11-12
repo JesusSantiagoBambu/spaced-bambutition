@@ -123,6 +123,7 @@
     const text = String(error.message || "").toLowerCase();
     if (error.code === "offline") return error.message;
     if (text.includes("expired") || text.includes("invalid") || error.code === "otp_expired") return "El código no es válido o ha caducado. Pide uno nuevo.";
+    if (text.includes("signup") || text.includes("not found") || error.code === "otp_disabled") return "Ese correo no tiene cuenta. Entra primero desde la app con ese correo.";
     if (text.includes("rate") || error.status === 429) return "Has pedido demasiados códigos seguidos. Espera un minuto y vuelve a intentarlo.";
     if (text.includes("email")) return "Revisa que el correo esté bien escrito.";
     return "No se ha podido completar. Inténtalo de nuevo en unos segundos.";
@@ -135,9 +136,9 @@
       authListeners.add(listener);
       return () => authListeners.delete(listener);
     },
-    async sendCode(email) {
+    async sendCode(email, { createUser = true } = {}) {
       try {
-        await raw("/auth/v1/otp", { method: "POST", auth: false, body: { email, create_user: true } });
+        await raw("/auth/v1/otp", { method: "POST", auth: false, body: { email, create_user: createUser } });
       } catch (error) {
         throw new CloudError(translateAuthError(error), error.code, error.status);
       }

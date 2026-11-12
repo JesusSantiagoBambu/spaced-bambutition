@@ -280,7 +280,7 @@
     const button = $("#loginSendBtn");
     button.disabled = true;
     try {
-      await cloud.auth.sendCode(loginEmail);
+      await cloud.auth.sendCode(loginEmail, { createUser: false });
       $("#loginEmailEcho").textContent = loginEmail;
       $("#loginEmailForm").hidden = true;
       $("#loginCodeForm").hidden = false;
