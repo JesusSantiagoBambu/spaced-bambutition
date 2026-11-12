@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#09A5BC" />
+    <meta name="robots" content="noindex" />
+    <title>Panel del profesor · Spaced Bambutition</title>
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="profesor.css" />
+  </head>
+  <body class="teacher-page">
+    <header class="topbar">
+      <div class="teacher-brand">
+        <h1>Spaced Bambutition</h1>
+        <p class="teacher-subtitle">Panel del profesor</p>
+      </div>
+      <div class="top-actions teacher-account" id="teacherAccount" hidden>
+        <span class="teacher-email" id="teacherEmail"></span>
+        <button class="ghost" type="button" id="refreshBtn">Actualizar</button>
+        <button class="ghost" type="button" id="signOutBtn">Salir</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="panel teacher-login" id="loginView" hidden>
+        <h2>Entra con tu correo de profesor</h2>
+        <form id="loginEmailForm" class="stack">
+          <p class="cloud-copy">Te enviaremos un código de acceso. Solo las cuentas marcadas como profesor pueden ver los datos de los alumnos.</p>
+          <label class="field-label" for="loginEmailInput">Correo electrónico</label>
+          <input id="loginEmailInput" type="email" autocomplete="email" required placeholder="tu@correo.com" />
+          <button class="primary" type="submit" id="loginSendBtn">Enviarme el código</button>
+        </form>
+        <form id="loginCodeForm" class="stack" hidden>
+          <p class="cloud-copy">Código enviado a <strong id="loginEmailEcho"></strong>.</p>
+          <label class="field-label" for="loginCodeInput">Código</label>
+          <input id="loginCodeInput" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required placeholder="123456" />
+          <button class="primary" type="submit" id="loginVerifyBtn">Entrar</button>
+          <button class="link-btn" type="button" id="loginBackBtn">Cambiar correo</button>
+        </form>
+        <p class="cloud-error" id="loginError" role="alert" hidden></p>
+      </section>
+
+      <section class="panel teacher-login" id="notTeacherView" hidden>
+        <h2>Esta cuenta no tiene acceso de profesor</h2>
+        <p class="cloud-copy">Has entrado como <strong id="notTeacherEmail"></strong>, pero esta cuenta está marcada como alumno. Si es tu cuenta de profesor, márcala como profesor en Supabase y vuelve a cargar esta página.</p>
+        <button class="ghost" type="button" id="notTeacherSignOut">Salir y entrar con otra cuenta</button>
+      </section>
+
+      <section class="panel teacher-login" id="setupView" hidden>
+        <h2>Falta conectar la nube</h2>
+        <p class="cloud-copy">El panel necesita la dirección y la clave pública del proyecto de Supabase en <code>cloud.js</code>.</p>
+      </section>
+
+      <section id="dashboardView" hidden>
+        <section class="summary-band" id="teacherSummary" aria-label="Resumen de la clase"></section>
+        <section class="panel teacher-list-panel">
+          <div class="section-title">
+            <h2>Alumnos</h2>
+            <span class="count-pill" id="studentCount">0</span>
+          </div>
+          <p class="muted teacher-hint">Ordenados por los que más atención necesitan: primero quienes tienen repasos atrasados. Toca un alumno para ver su detalle.</p>
+          <div id="studentList" class="student-list"></div>
+        </section>
+      </section>
+
+      <section id="studentView" hidden>
+        <button class="ghost back-btn" type="button" id="backBtn">← Todos los alumnos</button>
+        <div id="studentDetail"></div>
+      </section>
+
+      <p class="muted teacher-loading" id="loadingText" hidden>Cargando datos…</p>
+    </main>
+
+    <script src="cloud.js"></script>
+    <script src="profesor.js"></script>
+  </body>
+</html>
