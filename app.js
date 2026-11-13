@@ -1751,14 +1751,13 @@ function renderRewards() {
 
   state.rewards.forEach((reward) => {
     const canRedeem = state.points >= reward.cost;
-    const times = state.history.filter((item) => item.type === "redeemed" && item.rewardId === reward.id).length;
     const missing = Math.max(0, reward.cost - state.points);
     const card = document.createElement("article");
     card.className = "reward-card";
     card.innerHTML = `
       <div>
         <p class="card-title">${escapeHtml(reward.name)}</p>
-        <p class="card-meta">${reward.cost} puntos${times ? ` · canjeada ${times} ${times === 1 ? "vez" : "veces"}` : ""}${missing ? ` · te faltan ${missing}` : ""}</p>
+        <p class="card-meta">${reward.cost} puntos${missing ? ` · te faltan ${missing}` : ""}</p>
       </div>
       <div class="reward-actions">
         <button class="ghost danger delete-reward" type="button">🗑️ Borrar</button>
