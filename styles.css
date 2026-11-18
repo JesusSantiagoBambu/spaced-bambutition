@@ -1599,3 +1599,240 @@ dialog::backdrop {
     flex: 1;
   }
 }
+
+/* ---------- Impepinables de la semana ---------- */
+
+:root {
+  --impe: #F4EE9A;
+  --impe-deep: #8a7a00;
+}
+
+.impe-box {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1.4rem;
+  padding: 1rem 1.05rem;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--impe);
+  box-shadow: var(--lift);
+}
+
+.impe-box:empty {
+  display: none;
+}
+
+.impe-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.impe-head h2 {
+  font-size: 1.12rem;
+}
+
+.impe-count {
+  padding: 0.15rem 0.7rem;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.impe-copy {
+  margin: -0.25rem 0 0;
+  font-size: 0.88rem;
+}
+
+.impe-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.impe-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fffdf0;
+}
+
+.impe-item.is-today {
+  background: #fff;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.impe-item.is-done {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.impe-item.is-done .impe-text {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.impe-check {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.impe-check input {
+  flex: 0 0 auto;
+  width: 1.3rem;
+  height: 1.3rem;
+  accent-color: var(--moss);
+}
+
+.impe-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.impe-text small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.impe-chip {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(23, 33, 38, 0.08);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.impe-chip.is-today {
+  color: #fff;
+  background: var(--ink);
+}
+
+.impe-chip.is-late {
+  color: #a3301c;
+  background: var(--ember-soft);
+}
+
+.impe-chip.is-done {
+  color: #1f6e42;
+  background: var(--moss-soft);
+}
+
+.impe-celebrate {
+  margin: 0;
+  font-weight: 700;
+}
+
+.impe-edit {
+  justify-self: start;
+  color: var(--ink);
+}
+
+.impe-form,
+.impe-review {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.impe-form-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 9rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.impe-num {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 800;
+}
+
+.impe-note {
+  margin: 0;
+  color: #5c5410;
+  font-size: 0.8rem;
+}
+
+.impe-note:empty {
+  display: none;
+}
+
+.impe-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.impe-review-item {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fffdf0;
+}
+
+.impe-review-item .impe-text {
+  font-weight: 600;
+}
+
+.impe-review-item .impe-chip {
+  justify-self: start;
+}
+
+.impe-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.impe-choice .ghost {
+  min-height: 2.3rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.impe-choice .ghost.is-selected {
+  color: #fff;
+  background: var(--ink);
+}
+
+@media (max-width: 480px) {
+  .impe-form-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .impe-form-row select {
+    grid-column: 2;
+  }
+
+  .impe-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .impe-item .impe-chip {
+    margin-left: 1.9rem;
+  }
+}

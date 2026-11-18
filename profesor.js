@@ -89,7 +89,100 @@
       dueToday: topicRows.filter((item) => item.dueToday).length,
       weak: topicRows.filter((item) => item.last && item.last.score < 5).length,
       lastActivity: activityDates[activityDates.length - 1] || null,
+      impe: analyzeImpepinables(state.impepinables),
     };
+  }
+
+  // ---------- Impepinables ----------
+
+  const weekdays = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+  const parseKey = (key) => { const [y, m, d] = String(key).split("-").map(Number); return new Date(y, m - 1, d, 9); };
+  const weekStartKey = (date = new Date()) => { const d = startOfDay(date); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return dateKey(d); };
+  const shiftWeek = (key, weeks) => { const d = parseKey(key); d.setDate(d.getDate() + weeks * 7); return dateKey(d); };
+  const dayName = (key) => (key ? weekdays[(parseKey(key).getDay() + 6) % 7] : "");
+
+  function analyzeImpepinables(list) {
+    const weeks = (Array.isArray(list) ? list : []).filter((week) => week && week.weekStart && Array.isArray(week.items))
+      .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+    const currentKey = weekStartKey();
+    const byKey = new Map(weeks.map((week) => [week.weekStart, week]));
+    const complete = (week) => Boolean(week && week.items.length === 3 && week.items.every((item) => item.doneAt));
+    let cursor = complete(byKey.get(currentKey)) ? currentKey : shiftWeek(currentKey, -1);
+    let streak = 0;
+    while (complete(byKey.get(cursor))) { streak += 1; cursor = shiftWeek(cursor, -1); }
+    return {
+      weeks,
+      current: byKey.get(currentKey) || null,
+      previous: byKey.get(shiftWeek(currentKey, -1)) || null,
+      streak,
+    };
+  }
+
+  function impeItemHtml(item, { showReason = true } = {}) {
+    const todayKey = dateKey(new Date());
+    const status = item.doneAt ? "done" : item.plannedDate && item.plannedDate < todayKey ? "late" : "pending";
+    const icon = status === "done" ? "✅" : status === "late" ? "⏰" : "⬜";
+    return `
+      <li class="impe-row is-${status}">
+        <span class="impe-row-icon" aria-hidden="true">${icon}</span>
+        <span class="impe-row-text">${escapeHtml(item.text)} <small>· ${dayName(item.plannedDate)}${status === "late" ? " (pasado)" : ""}</small>
+          ${showReason && item.missReason ? `<em class="impe-row-reason">Motivo: ${escapeHtml(item.missReason)}</em>` : ""}
+        </span>
+      </li>
+    `;
+  }
+
+  function weekResult(week) {
+    if (!week) return "";
+    const done = week.items.filter((item) => item.doneAt).length;
+    return `${done}/${week.items.length}`;
+  }
+
+  function renderImpePanel() {
+    const list = $("#impePanelList");
+    const withData = students.filter((student) => student.hasData);
+    const set = withData.filter((student) => student.impe.current).length;
+    $("#impePanelCount").textContent = `${set}/${withData.length} los han puesto`;
+    if (!withData.length) {
+      list.innerHTML = `<div class="empty-state"><strong>Cuando tus alumnos entren con su cuenta, verás aquí sus impepinables.</strong></div>`;
+      return;
+    }
+    const ordered = withData.slice().sort((a, b) => Number(Boolean(a.impe.current)) - Number(Boolean(b.impe.current)));
+    list.innerHTML = ordered.map((student) => {
+      const { current, previous, streak } = student.impe;
+      const name = escapeHtml(student.name || student.email);
+      const prevMisses = previous ? previous.items.filter((item) => !item.doneAt) : [];
+      return `
+        <article class="impe-card${current ? "" : " is-missing"}">
+          <header class="impe-card-head">
+            <button type="button" class="link-btn impe-student" data-id="${student.id}">${name}</button>
+            ${current
+              ? `<span class="impe-count">${weekResult(current)}</span>`
+              : `<span class="badge warning">Aún no los ha puesto</span>`}
+          </header>
+          ${current ? `<ul class="impe-rows">${current.items.map((item) => impeItemHtml(item, { showReason: false })).join("")}</ul>` : ""}
+          <p class="impe-card-foot">
+            ${previous ? `Semana pasada: <strong>${weekResult(previous)}</strong>` : "Sin semana anterior"}
+            ${streak ? ` · 🔥 ${streak === 1 ? "1 semana cumpliendo los 3" : `${streak} semanas seguidas cumpliendo los 3`}` : ""}
+          </p>
+          ${prevMisses.length ? `<ul class="impe-rows is-misses">${prevMisses.map((item) => `
+            <li class="impe-row is-late"><span class="impe-row-icon" aria-hidden="true">✗</span><span class="impe-row-text">${escapeHtml(item.text)}
+              <em class="impe-row-reason">${item.missReason ? `Motivo: ${escapeHtml(item.missReason)}` : previous.reviewedAt ? "Sin motivo" : "Todavía no ha cerrado la semana"}</em></span></li>`).join("")}</ul>` : ""}
+        </article>
+      `;
+    }).join("");
+    list.querySelectorAll(".impe-student").forEach((button) => button.addEventListener("click", () => openStudent(button.dataset.id)));
+  }
+
+  function impeHistoryHtml(student) {
+    const weeks = student.impe.weeks;
+    if (!weeks.length) return `<div class="empty-state"><strong>Todavía no ha puesto ningún impepinable.</strong></div>`;
+    return `<div class="impe-history">${weeks.slice(0, 12).map((week) => `
+      <section class="impe-history-week">
+        <p class="impe-history-title">Semana del ${fmtDate(parseKey(week.weekStart))} · <strong>${weekResult(week)}</strong>${week.weekStart === weekStartKey() ? " · esta semana" : ""}</p>
+        <ul class="impe-rows">${week.items.map((item) => impeItemHtml(item)).join("")}</ul>
+      </section>
+    `).join("")}</div>`;
   }
 
   // ---------- Carga ----------
@@ -105,6 +198,7 @@
       students = (profiles || []).map((profile) => analyze(profile, byUser.get(profile.id)));
       students.sort((a, b) => (b.overdue - a.overdue) || ((b.lastActivity || "") > (a.lastActivity || "") ? 1 : -1));
       renderDashboard();
+      renderImpePanel();
       show("dashboardView");
     } catch (error) {
       if (!cloud.auth.user()) return start();
@@ -187,6 +281,11 @@
       <section class="panel">
         <div class="section-title"><h2>Temas</h2><span class="count-pill">${topics.length}</span></div>
         ${topics.length ? `<div class="teacher-topics">${topics.map((row) => topicRowHtml(row)).join("")}</div>` : `<div class="empty-state"><strong>Sin temas todavía.</strong></div>`}
+      </section>
+
+      <section class="panel">
+        <div class="section-title"><h2>🟨 Impepinables</h2>${student.impe.streak ? `<span class="count-pill">🔥 ${student.impe.streak} seguidas</span>` : ""}</div>
+        ${impeHistoryHtml(student)}
       </section>
 
       <section class="panel">

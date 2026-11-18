@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="profesor.css?v=2" />
+    <link rel="stylesheet" href="profesor.css?v=3" />
   </head>
   <body class="teacher-page">
     <header class="topbar">
@@ -58,6 +58,13 @@
 
       <section id="dashboardView" hidden>
         <section class="summary-band" id="teacherSummary" aria-label="Resumen de la clase"></section>
+        <section class="panel impe-panel" aria-labelledby="impePanelTitle">
+          <div class="section-title">
+            <h2 id="impePanelTitle">🟨 Impepinables de esta semana</h2>
+            <span class="count-pill" id="impePanelCount">0</span>
+          </div>
+          <div id="impePanelList" class="impe-class-list"></div>
+        </section>
         <section class="panel teacher-list-panel">
           <div class="section-title">
             <h2>Alumnos</h2>
@@ -76,7 +83,7 @@
       <p class="muted teacher-loading" id="loadingText" hidden>Cargando datos…</p>
     </main>
 
-    <script src="cloud.js?v=2"></script>
-    <script src="profesor.js?v=2"></script>
+    <script src="cloud.js?v=3"></script>
+    <script src="profesor.js?v=3"></script>
   </body>
 </html>

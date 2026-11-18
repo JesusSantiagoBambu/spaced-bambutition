@@ -204,7 +204,7 @@
 
   function hasMeaningfulData(stateData) {
     const summary = summarize(stateData);
-    return summary.topics > 0 || summary.reviews > 0 || (Array.isArray(stateData?.ivyTasks) && stateData.ivyTasks.length > 0);
+    return summary.topics > 0 || summary.reviews > 0 || (Array.isArray(stateData?.ivyTasks) && stateData.ivyTasks.length > 0) || (Array.isArray(stateData?.impepinables) && stateData.impepinables.length > 0);
   }
 
   async function fetchRemote() {

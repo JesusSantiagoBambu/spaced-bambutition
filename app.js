@@ -18,6 +18,14 @@ const srsConfig = {
   },
 };
 const ivyTaskLimit = 6;
+const impeEditWindowMs = 2 * 60 * 60 * 1000;
+const impeWeekdays = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+const impePlaceholders = ["Ej.: hacer un simulacro completo", "Ej.: terminar el tema 7", "Ej.: repasar los temas 1 a 3"];
+let impeEditing = false;
+let impeReviewChoices = {};
+const cloudBannerKey = "spaced-bambutition-cloud-banner-dismissed";
+let cloudEmail = "";
+let conflictResolver = null;
 const xpPerLevel = 250;
 const ivyPointsPerPomodoro = 5;
 const pomodoroDurations = [25, 30, 35, 50];
@@ -89,6 +97,7 @@ const els = {
   installNowBtn: document.querySelector("#installNowBtn"),
   dailyLimitSelect: document.querySelector("#dailyLimitSelect"),
   calendarCount: document.querySelector("#calendarCount"),
+  impeBox: document.querySelector("#impeBox"),
   overallChart: document.querySelector("#overallChart"),
   reviewPastNotes: document.querySelector("#reviewPastNotes"),
   topicDialog: document.querySelector("#topicDialog"),
@@ -317,8 +326,8 @@ function toggleTopicPanel() {
   setTopicPanelCollapsed(!els.topicPanel.classList.contains("is-collapsed"));
 }
 
-function setupHelpPopovers() {
-  document.querySelectorAll(".help-wrap").forEach((wrap) => {
+function setupHelpPopovers(root = document) {
+  root.querySelectorAll(".help-wrap").forEach((wrap) => {
     const button = wrap.querySelector(".help-btn");
     if (!button) return;
     button.setAttribute("aria-expanded", "false");
@@ -451,6 +460,7 @@ function normalizeState(raw) {
     rewards: normalizeRewards(raw.rewards, history),
     ivyTasks: Array.isArray(raw.ivyTasks) ? raw.ivyTasks.map(normalizeIvyTask) : [],
     history,
+    impepinables: normalizeImpepinables(raw.impepinables),
   };
 }
 
@@ -1296,6 +1306,7 @@ function render() {
 
   els.levelStat.textContent = Math.floor(lifetimeXp() / xpPerLevel) + 1;
   renderSubjectOptions();
+  renderImpepinables();
   renderDueList(due);
   renderIvyStats(ivyPomodoroStats());
   renderIvyTasks(ivyTasks);
@@ -1835,9 +1846,6 @@ function escapeHtml(value) {
 
 // ---------- Cuenta y copia en la nube ----------
 
-const cloudBannerKey = "spaced-bambutition-cloud-banner-dismissed";
-let cloudEmail = "";
-let conflictResolver = null;
 
 function setupCloud() {
   const cloud = window.BambuCloud;
@@ -2085,4 +2093,295 @@ function setupCloud() {
   });
 
   renderCloudStatus(cloud.sync.status());
+}
+
+// ---------- Impepinables de la semana ----------
+// Cada lunes el alumno se compromete con 3 cosas que hara si o si, cada una con su dia.
+// Una vez guardadas solo se pueden corregir durante 2 horas. Antes de poner las nuevas,
+// revisa la semana anterior y explica en una linea lo que no cumplio.
+
+
+function normalizeImpepinables(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((week) => week && /^\d{4}-\d{2}-\d{2}$/.test(String(week.weekStart || "")))
+    .map((week) => ({
+      weekStart: week.weekStart,
+      createdAt: week.createdAt || "",
+      reviewedAt: week.reviewedAt || "",
+      items: (Array.isArray(week.items) ? week.items : []).slice(0, 3).map((item) => ({
+        id: item.id || crypto.randomUUID(),
+        text: String(item.text || "").slice(0, 90),
+        plannedDate: item.plannedDate || "",
+        doneAt: item.doneAt || "",
+        missReason: String(item.missReason || "").slice(0, 200),
+      })),
+    }))
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+    .slice(-60);
+}
+
+function weekStartKey(date = new Date()) {
+  const day = startOfDay(date);
+  day.setDate(day.getDate() - ((day.getDay() + 6) % 7));
+  return dateKey(day);
+}
+
+function shiftWeek(key, weeks) {
+  const date = parseDate(key);
+  date.setDate(date.getDate() + weeks * 7);
+  return dateKey(date);
+}
+
+function impeWeek(key) {
+  return state.impepinables.find((week) => week.weekStart === key) || null;
+}
+
+function impeWeekToReview() {
+  const current = weekStartKey();
+  return state.impepinables
+    .filter((week) => week.weekStart < current && week.items.length && !week.reviewedAt)
+    .sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0] || null;
+}
+
+function impeIsComplete(week) {
+  return Boolean(week && week.items.length === 3 && week.items.every((item) => item.doneAt));
+}
+
+function impeStreak() {
+  let cursor = weekStartKey();
+  if (!impeIsComplete(impeWeek(cursor))) cursor = shiftWeek(cursor, -1);
+  let streak = 0;
+  while (impeIsComplete(impeWeek(cursor))) {
+    streak += 1;
+    cursor = shiftWeek(cursor, -1);
+  }
+  return streak;
+}
+
+function impeEditableUntil(week) {
+  if (!week?.createdAt) return null;
+  const until = new Date(new Date(week.createdAt).getTime() + impeEditWindowMs);
+  return until > new Date() ? until : null;
+}
+
+function impeDayLabel(dateString) {
+  const date = parseDate(dateString);
+  return impeWeekdays[(date.getDay() + 6) % 7];
+}
+
+function impeDayOptions(selected) {
+  const monday = parseDate(weekStartKey());
+  const todayKey = dateKey(new Date());
+  let options = "";
+  for (let index = 0; index < 7; index += 1) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    const key = dateKey(date);
+    if (key < todayKey && key !== selected) continue;
+    const label = `${impeWeekdays[index].replace(/^./, (c) => c.toUpperCase())} ${date.getDate()}`;
+    options += `<option value="${key}"${key === selected ? " selected" : ""}>${label}</option>`;
+  }
+  return options;
+}
+
+function renderImpepinables() {
+  const box = els.impeBox;
+  if (!box) return;
+  const review = impeWeekToReview();
+  if (review) return renderImpeReview(box, review);
+  const week = impeWeek(weekStartKey());
+  if (!week || impeEditing) return renderImpeForm(box, week);
+  renderImpeActive(box, week);
+}
+
+function impeHeader(title, extra = "") {
+  return `
+    <div class="impe-head">
+      <h2 id="impeTitle" class="label-row">
+        ${title}
+        <span class="help-wrap">
+          <button class="help-btn" type="button" aria-label="Ayuda: impepinables">?</button>
+          <span class="help-popover" role="tooltip">Tres cosas que vas a hacer sí o sí esta semana, aunque todo lo demás se tuerza. Elige un día para cada una. Una vez guardadas no se pueden cambiar hasta el lunes siguiente (tienes 2 horas por si te equivocas al escribir). El lunes repasas cómo te fue antes de poner las nuevas.</span>
+        </span>
+      </h2>
+      ${extra}
+    </div>
+  `;
+}
+
+function renderImpeForm(box, week) {
+  const editing = Boolean(week);
+  const items = week?.items || [];
+  const sunday = dateKey(addDays(parseDate(weekStartKey()), 6));
+  box.className = "impe-box is-form";
+  box.innerHTML = `
+    ${impeHeader(editing ? "Corrige tus impepinables" : "Tus 3 impepinables de la semana")}
+    <p class="impe-copy">${editing
+      ? "Puedes corregirlos durante 2 horas desde que los guardaste. Después quedan fijados hasta el lunes."
+      : "Tres cosas que vas a hacer <strong>sí o sí</strong> esta semana, aunque todo lo demás se tuerza. Ponle un día a cada una."}</p>
+    <form class="impe-form" id="impeForm">
+      ${[0, 1, 2].map((index) => `
+        <div class="impe-form-row">
+          <span class="impe-num" aria-hidden="true">${index + 1}</span>
+          <input id="impeText${index}" maxlength="90" required placeholder="${impePlaceholders[index]}" value="${escapeHtml(items[index]?.text || "")}" aria-label="Impepinable ${index + 1}" />
+          <select id="impeDay${index}" aria-label="Día para el impepinable ${index + 1}">${impeDayOptions(items[index]?.plannedDate || sunday)}</select>
+        </div>
+      `).join("")}
+      <p class="impe-note">${editing ? "" : "Cuando los guardes no podrás cambiarlos hasta el lunes que viene (tienes 2 horas por si te equivocas al escribir)."}</p>
+      <div class="impe-actions">
+        ${editing ? `<button class="ghost" type="button" id="impeCancelBtn">Cancelar</button>` : ""}
+        <button class="primary" type="submit">${editing ? "Guardar cambios" : "Me comprometo"}</button>
+      </div>
+    </form>
+  `;
+  setupHelpPopovers(box);
+  box.querySelector("#impeForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const nextItems = [0, 1, 2].map((index) => ({
+      id: items[index]?.id || crypto.randomUUID(),
+      text: box.querySelector(`#impeText${index}`).value.trim(),
+      plannedDate: box.querySelector(`#impeDay${index}`).value,
+      doneAt: items[index]?.doneAt || "",
+      missReason: "",
+    }));
+    if (nextItems.some((item) => !item.text)) return;
+    if (editing) {
+      if (!impeEditableUntil(week)) {
+        impeEditing = false;
+        render();
+        return;
+      }
+      week.items = nextItems;
+    } else {
+      state.impepinables.push({ weekStart: weekStartKey(), createdAt: new Date().toISOString(), reviewedAt: "", items: nextItems });
+    }
+    impeEditing = false;
+    saveState();
+    render();
+  });
+  box.querySelector("#impeCancelBtn")?.addEventListener("click", () => {
+    impeEditing = false;
+    render();
+  });
+}
+
+function renderImpeActive(box, week) {
+  const todayKey = dateKey(new Date());
+  const done = week.items.filter((item) => item.doneAt).length;
+  const streak = impeStreak();
+  const editableUntil = impeEditableUntil(week);
+  const complete = impeIsComplete(week);
+  box.className = `impe-box${complete ? " is-complete" : ""}`;
+  box.innerHTML = `
+    ${impeHeader("Mis 3 impepinables", `<span class="impe-count">${done}/3</span>`)}
+    <p class="impe-copy">Semana del ${shortDate(parseDate(week.weekStart))}${streak ? ` · 🔥 ${streak} ${streak === 1 ? "semana impepinable" : "semanas impepinables seguidas"}` : ""}</p>
+    <ul class="impe-list">
+      ${week.items.map((item) => {
+        const isToday = !item.doneAt && item.plannedDate === todayKey;
+        const late = !item.doneAt && item.plannedDate && item.plannedDate < todayKey;
+        const chip = item.doneAt
+          ? `<span class="impe-chip is-done">Hecho</span>`
+          : isToday
+            ? `<span class="impe-chip is-today">Hoy toca</span>`
+            : late
+              ? `<span class="impe-chip is-late">Era para el ${impeDayLabel(item.plannedDate)}</span>`
+              : `<span class="impe-chip">${impeDayLabel(item.plannedDate).replace(/^./, (c) => c.toUpperCase())}</span>`;
+        return `
+          <li class="impe-item${item.doneAt ? " is-done" : ""}${isToday ? " is-today" : ""}">
+            <label class="impe-check">
+              <input type="checkbox" data-id="${item.id}" ${item.doneAt ? "checked" : ""} aria-label="Marcar como cumplido: ${escapeHtml(item.text)}" />
+              <span class="impe-text">${escapeHtml(item.text)}</span>
+            </label>
+            ${chip}
+          </li>
+        `;
+      }).join("")}
+    </ul>
+    ${complete ? `<p class="impe-celebrate">¡Semana impepinable! Has cumplido los 3. 💪</p>` : ""}
+    ${editableUntil ? `<button class="link-btn impe-edit" type="button" id="impeEditBtn">Corregir (puedes hasta las ${new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" }).format(editableUntil)})</button>` : ""}
+  `;
+  setupHelpPopovers(box);
+  box.querySelectorAll(".impe-check input").forEach((input) => {
+    input.addEventListener("change", () => {
+      const item = week.items.find((entry) => entry.id === input.dataset.id);
+      if (!item) return;
+      item.doneAt = input.checked ? new Date().toISOString() : "";
+      saveState();
+      render();
+    });
+  });
+  box.querySelector("#impeEditBtn")?.addEventListener("click", () => {
+    impeEditing = true;
+    render();
+  });
+}
+
+function renderImpeReview(box, week) {
+  box.className = "impe-box is-review";
+  box.innerHTML = `
+    ${impeHeader("¿Cumpliste tus impepinables?")}
+    <p class="impe-copy">Antes de poner los de esta semana, cierra la del ${shortDate(parseDate(week.weekStart))}. Si alguno no salió, cuenta en una línea por qué: sirve para ajustar los siguientes.</p>
+    <form class="impe-review" id="impeReviewForm">
+      ${week.items.map((item) => {
+        const choice = item.doneAt ? "done" : impeReviewChoices[item.id] || "";
+        return `
+          <div class="impe-review-item" data-id="${item.id}">
+            <p class="impe-text">${escapeHtml(item.text)} <small>(${impeDayLabel(item.plannedDate)})</small></p>
+            ${item.doneAt
+              ? `<span class="impe-chip is-done">Cumplido</span>`
+              : `<div class="impe-choice">
+                  <button type="button" class="ghost${choice === "done" ? " is-selected" : ""}" data-choice="done">Sí, lo hice</button>
+                  <button type="button" class="ghost${choice === "miss" ? " is-selected" : ""}" data-choice="miss">No lo cumplí</button>
+                </div>
+                ${choice === "miss" ? `<input class="impe-reason" maxlength="200" required placeholder="¿Qué pasó? Una línea basta" aria-label="Motivo de no cumplir: ${escapeHtml(item.text)}" />` : ""}`}
+          </div>
+        `;
+      }).join("")}
+      <div class="impe-actions">
+        <button class="primary" type="submit">Cerrar la semana</button>
+      </div>
+    </form>
+  `;
+  setupHelpPopovers(box);
+  const form = box.querySelector("#impeReviewForm");
+  form.querySelectorAll("[data-choice]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.closest(".impe-review-item").dataset.id;
+      const reasons = {};
+      form.querySelectorAll(".impe-review-item").forEach((row) => {
+        const input = row.querySelector(".impe-reason");
+        if (input) reasons[row.dataset.id] = input.value;
+      });
+      impeReviewChoices[id] = button.dataset.choice;
+      renderImpeReview(box, week);
+      Object.entries(reasons).forEach(([rowId, value]) => {
+        const input = box.querySelector(`.impe-review-item[data-id="${rowId}"] .impe-reason`);
+        if (input) input.value = value;
+      });
+      box.querySelector(`.impe-review-item[data-id="${id}"] .impe-reason`)?.focus();
+    });
+  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const pending = week.items.filter((item) => !item.doneAt && !impeReviewChoices[item.id]);
+    if (pending.length) {
+      alert("Indica si cumpliste cada uno de los impepinables.");
+      return;
+    }
+    const weekEnd = addDays(parseDate(week.weekStart), 6).toISOString();
+    week.items.forEach((item) => {
+      if (item.doneAt) return;
+      if (impeReviewChoices[item.id] === "done") {
+        item.doneAt = weekEnd;
+      } else {
+        const input = form.querySelector(`.impe-review-item[data-id="${item.id}"] .impe-reason`);
+        item.missReason = input?.value.trim() || "";
+      }
+    });
+    week.reviewedAt = new Date().toISOString();
+    impeReviewChoices = {};
+    saveState();
+    render();
+  });
 }

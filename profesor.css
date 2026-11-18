@@ -264,3 +264,139 @@
 .teacher-login form[hidden] {
   display: none;
 }
+
+/* Impepinables */
+
+.impe-panel {
+  margin-bottom: 1rem;
+  padding: 1.1rem;
+  background: #F4EE9A;
+}
+
+.impe-class-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.7rem;
+}
+
+.impe-card {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  padding: 0.8rem 0.9rem;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fffdf0;
+}
+
+.impe-card.is-missing {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.impe-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.impe-student {
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.impe-count {
+  flex: 0 0 auto;
+  padding: 0.1rem 0.6rem;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.impe-rows {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.impe-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.87rem;
+}
+
+.impe-row-text {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.impe-row-text small {
+  display: inline;
+  color: var(--muted);
+}
+
+.impe-row.is-done .impe-row-text {
+  color: var(--muted);
+}
+
+.impe-row.is-late .impe-row-icon {
+  color: var(--ember);
+  font-weight: 800;
+}
+
+.impe-row-reason {
+  color: #7a3a1c;
+  font-size: 0.8rem;
+  font-style: normal;
+}
+
+.impe-rows.is-misses {
+  padding-top: 0.4rem;
+  border-top: 2px dashed rgba(23, 33, 38, 0.15);
+}
+
+.impe-card-foot {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.impe-history {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.impe-history-week {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem 0.85rem;
+  border: 2px solid rgba(23, 33, 38, 0.15);
+  border-radius: var(--radius-md);
+}
+
+.impe-history-title {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.impe-class-list {
+  align-items: start;
+}
+
+.impe-row-text {
+  display: block;
+}
+
+.impe-row-reason {
+  display: block;
+}
