@@ -23,6 +23,7 @@ const impeWeekdays = ["lunes", "martes", "miércoles", "jueves", "viernes", "sá
 const impePlaceholders = ["Ej.: hacer un simulacro completo", "Ej.: terminar el tema 7", "Ej.: repasar los temas 1 a 3"];
 let impeEditing = false;
 let impeReviewChoices = {};
+const impeCollapsedKey = "spaced-bambutition-impe-collapsed";
 const cloudBannerKey = "spaced-bambutition-cloud-banner-dismissed";
 let cloudEmail = "";
 let conflictResolver = null;
@@ -98,6 +99,7 @@ const els = {
   dailyLimitSelect: document.querySelector("#dailyLimitSelect"),
   calendarCount: document.querySelector("#calendarCount"),
   impeBox: document.querySelector("#impeBox"),
+  impeStreakStat: document.querySelector("#impeStreakStat"),
   overallChart: document.querySelector("#overallChart"),
   reviewPastNotes: document.querySelector("#reviewPastNotes"),
   topicDialog: document.querySelector("#topicDialog"),
@@ -2185,14 +2187,53 @@ function impeDayOptions(selected) {
   return options;
 }
 
+function impeCollapsed() {
+  try {
+    return localStorage.getItem(impeCollapsedKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setImpeCollapsed(collapsed) {
+  try {
+    localStorage.setItem(impeCollapsedKey, collapsed ? "1" : "0");
+  } catch {}
+  render();
+}
+
 function renderImpepinables() {
+  const streak = impeStreak();
+  if (els.impeStreakStat) els.impeStreakStat.textContent = `${streak} ${streak === 1 ? "semana" : "semanas"}`;
   const box = els.impeBox;
   if (!box) return;
   const review = impeWeekToReview();
-  if (review) return renderImpeReview(box, review);
   const week = impeWeek(weekStartKey());
+  if (impeCollapsed()) {
+    const status = review
+      ? "Toca cerrar la semana pasada"
+      : !week
+        ? "Aún no los has puesto"
+        : `${week.items.filter((item) => item.doneAt).length}/3 cumplidos`;
+    return renderImpeCollapsed(box, status, Boolean(review || !week));
+  }
+  if (review) return renderImpeReview(box, review);
   if (!week || impeEditing) return renderImpeForm(box, week);
   renderImpeActive(box, week);
+}
+
+function renderImpeCollapsed(box, status, needsAction) {
+  box.className = `impe-box is-collapsed${needsAction ? " needs-action" : ""}`;
+  box.innerHTML = `
+    <div class="impe-head">
+      <h2 id="impeTitle">Mis 3 impepinables</h2>
+      <div class="impe-head-actions">
+        <span class="impe-status">${status}</span>
+        <button class="ghost impe-toggle" type="button" aria-expanded="false">Mostrar</button>
+      </div>
+    </div>
+  `;
+  box.querySelector(".impe-toggle").addEventListener("click", () => setImpeCollapsed(false));
 }
 
 function impeHeader(title, extra = "") {
@@ -2205,7 +2246,10 @@ function impeHeader(title, extra = "") {
           <span class="help-popover" role="tooltip">Tres cosas que vas a hacer sí o sí esta semana, aunque todo lo demás se tuerza. Elige un día para cada una. Una vez guardadas no se pueden cambiar hasta el lunes siguiente (tienes 2 horas por si te equivocas al escribir). El lunes repasas cómo te fue antes de poner las nuevas.</span>
         </span>
       </h2>
-      ${extra}
+      <div class="impe-head-actions">
+        ${extra}
+        <button class="ghost impe-toggle" type="button" aria-expanded="true">Ocultar</button>
+      </div>
     </div>
   `;
 }
@@ -2236,6 +2280,7 @@ function renderImpeForm(box, week) {
     </form>
   `;
   setupHelpPopovers(box);
+  box.querySelector(".impe-toggle")?.addEventListener("click", () => setImpeCollapsed(true));
   box.querySelector("#impeForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const nextItems = [0, 1, 2].map((index) => ({
@@ -2302,6 +2347,7 @@ function renderImpeActive(box, week) {
     ${editableUntil ? `<button class="link-btn impe-edit" type="button" id="impeEditBtn">Corregir (puedes hasta las ${new Intl.DateTimeFormat("es", { hour: "2-digit", minute: "2-digit" }).format(editableUntil)})</button>` : ""}
   `;
   setupHelpPopovers(box);
+  box.querySelector(".impe-toggle")?.addEventListener("click", () => setImpeCollapsed(true));
   box.querySelectorAll(".impe-check input").forEach((input) => {
     input.addEventListener("change", () => {
       const item = week.items.find((entry) => entry.id === input.dataset.id);
@@ -2344,6 +2390,7 @@ function renderImpeReview(box, week) {
     </form>
   `;
   setupHelpPopovers(box);
+  box.querySelector(".impe-toggle")?.addEventListener("click", () => setImpeCollapsed(true));
   const form = box.querySelector("#impeReviewForm");
   form.querySelectorAll("[data-choice]").forEach((button) => {
     button.addEventListener("click", () => {

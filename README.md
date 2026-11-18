@@ -61,7 +61,7 @@ Cuando cambies archivos cacheados, sube tambien la version de `cacheName` en `sw
 - Borrado de temarios desde la vista de progreso cuando se han creado por error.
 - Pantalla ordenada con los repasos de hoy como primer bloque util en movil y tablet.
 - Asignaturas/oposiciones reutilizables: al crear un temario, se guardan para poder elegirlas despues desde el desplegable.
-- "Mis 3 impepinables" (caja amarilla en Hoy): cada lunes el alumno se compromete con 3 tareas, cada una con su dia. Se pueden corregir solo durante 2 horas; el dia previsto aparece "Hoy toca"; antes de poner los nuevos revisa la semana anterior y explica lo que no cumplio. Racha de semanas cumpliendo los 3. Todo se ve en el panel del profesor.
+- "Mis 3 impepinables" (caja amarilla en Hoy, debajo de Ivy Lee y plegable): cada lunes el alumno se compromete con 3 tareas, cada una con su dia. Se pueden corregir solo durante 2 horas; el dia previsto aparece "Hoy toca"; antes de poner los nuevos revisa la semana anterior y explica lo que no cumplio. Racha de semanas cumpliendo los 3, visible en el resumen superior. Todo se ve en el panel del profesor.
 - Recompensas que se pueden canjear tantas veces como se quiera mientras haya puntos (cada canje queda registrado; borrar una recompensa no devuelve los puntos gastados).
 
 ## Nota

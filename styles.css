@@ -166,7 +166,7 @@ h3 {
 
 .summary-band {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.6rem;
   margin-bottom: 1rem;
   padding: 0.75rem;
@@ -1367,10 +1367,6 @@ dialog::backdrop {
     padding: 0.6rem;
   }
 
-  .summary-band .stat:last-child {
-    grid-column: 1 / -1;
-  }
-
   .stat strong {
     font-size: 1.15rem;
   }
@@ -1834,5 +1830,57 @@ dialog::backdrop {
 
   .impe-item .impe-chip {
     margin-left: 1.9rem;
+  }
+}
+
+/* Ajustes impepinables: contador en el resumen, caja plegable bajo Ivy Lee */
+
+.stat.stat-impe {
+  background: var(--impe);
+}
+
+.ivy-section + .impe-box {
+  margin-top: 1.4rem;
+  margin-bottom: 0;
+}
+
+.impe-head-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.impe-toggle {
+  min-height: 2rem;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 0 var(--line);
+}
+
+.impe-box.is-collapsed {
+  padding: 0.7rem 1rem;
+  box-shadow: var(--lift-soft);
+}
+
+.impe-box.is-collapsed h2 {
+  font-size: 1rem;
+}
+
+.impe-status {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.impe-box.needs-action .impe-status {
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--ink);
+}
+
+@media (max-width: 480px) {
+  .impe-box.is-collapsed .impe-head {
+    flex-wrap: wrap;
   }
 }

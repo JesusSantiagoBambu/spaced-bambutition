@@ -110,6 +110,16 @@
           </span>
           <strong class="load-value"><span id="loadStat">0/</span><select id="dailyLimitSelect" aria-label="Máximo de repasos al día"></select></strong>
         </div>
+        <div class="stat stat-impe">
+          <span class="stat-label label-row">
+            🟨 Impepinables
+            <span class="help-wrap">
+              <button class="help-btn" type="button" aria-label="Ayuda: semanas impepinables">?</button>
+              <span class="help-popover" role="tooltip">Semanas seguidas cumpliendo tus 3 impepinables. Si una semana no cumples los 3, vuelve a 0.</span>
+            </span>
+          </span>
+          <strong id="impeStreakStat">0 semanas</strong>
+        </div>
       </section>
 
       <section class="workspace">
@@ -122,8 +132,6 @@
           </nav>
 
           <div id="todayView" class="view active">
-            <section class="impe-box" id="impeBox" aria-labelledby="impeTitle"></section>
-
             <div class="section-title">
               <h2 class="label-row">
                 Repasos de hoy
@@ -167,6 +175,7 @@
               <div id="ivyList" class="ivy-list"></div>
             </section>
 
+            <section class="impe-box" id="impeBox" aria-labelledby="impeTitle"></section>
           </div>
 
           <div id="calendarView" class="view">
