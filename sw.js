@@ -1,10 +1,10 @@
-const cacheName = "spaced-bambutition-v14";
+const cacheName = "spaced-bambutition-v15";
 const appShell = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./cloud.js",
-  "./app.js",
+  "./styles.css?v=15",
+  "./cloud.js?v=15",
+  "./app.js?v=15",
   "./app.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-192.png",

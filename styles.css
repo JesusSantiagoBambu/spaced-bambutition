@@ -1839,8 +1839,8 @@ dialog::backdrop {
   background: var(--impe);
 }
 
-.ivy-section + .impe-box {
-  margin-top: 1.4rem;
+.impe-box:not(.is-on-top) {
+  margin-top: 1.6rem;
   margin-bottom: 0;
 }
 
@@ -1883,4 +1883,9 @@ dialog::backdrop {
   .impe-box.is-collapsed .impe-head {
     flex-wrap: wrap;
   }
+}
+
+.impe-box.is-on-top {
+  margin-top: 0;
+  margin-bottom: 1.4rem;
 }

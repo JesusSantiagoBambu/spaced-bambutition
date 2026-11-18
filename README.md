@@ -28,7 +28,7 @@ Si esta publicada en GitHub Pages, el flujo normal es:
 3. GitHub Pages publica automaticamente la nueva version.
 4. La app detecta el nuevo `sw.js`, limpia la cache anterior y recarga para usar la version actualizada.
 
-Cuando cambies archivos cacheados, sube tambien la version de `cacheName` en `sw.js` para forzar que los alumnos reciban la nueva app.
+Cuando cambies archivos cacheados, sube la version de `cacheName` en `sw.js` y el numero `?v=` de `styles.css`, `cloud.js` y `app.js` (en `index.html`, `profesor.html` y en la lista de `sw.js`). Asi cada version de la pagina carga siempre sus propios archivos.
 
 ## Que incluye
 

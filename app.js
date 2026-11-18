@@ -2209,17 +2209,34 @@ function renderImpepinables() {
   if (!box) return;
   const review = impeWeekToReview();
   const week = impeWeek(weekStartKey());
-  if (impeCollapsed()) {
+  const needsAction = Boolean(review || !week);
+  placeImpeBox(box, needsAction);
+  if (impeCollapsed() && !needsAction) {
     const status = review
       ? "Toca cerrar la semana pasada"
       : !week
         ? "Aún no los has puesto"
         : `${week.items.filter((item) => item.doneAt).length}/3 cumplidos`;
-    return renderImpeCollapsed(box, status, Boolean(review || !week));
+    return renderImpeCollapsed(box, status, false);
   }
-  if (review) return renderImpeReview(box, review);
-  if (!week || impeEditing) return renderImpeForm(box, week);
-  renderImpeActive(box, week);
+  if (review) renderImpeReview(box, review);
+  else if (!week || impeEditing) renderImpeForm(box, week);
+  else renderImpeActive(box, week);
+  box.classList.toggle("is-on-top", needsAction);
+}
+
+// Si falta poner los impepinables o cerrar la semana, la caja va arriba del todo en Hoy;
+// una vez rellenados, baja debajo de Ivy Lee para que lo primero sean los repasos.
+function placeImpeBox(box, onTop) {
+  const view = document.querySelector("#todayView");
+  const ivy = view?.querySelector(".ivy-section");
+  if (!view || !ivy) return;
+  if (onTop) {
+    if (view.firstElementChild !== box) view.prepend(box);
+  } else if (ivy.nextElementSibling !== box) {
+    ivy.after(box);
+  }
+  box.classList.toggle("is-on-top", onTop);
 }
 
 function renderImpeCollapsed(box, status, needsAction) {
@@ -2236,7 +2253,7 @@ function renderImpeCollapsed(box, status, needsAction) {
   box.querySelector(".impe-toggle").addEventListener("click", () => setImpeCollapsed(false));
 }
 
-function impeHeader(title, extra = "") {
+function impeHeader(title, extra = "", { toggle = true } = {}) {
   return `
     <div class="impe-head">
       <h2 id="impeTitle" class="label-row">
@@ -2248,7 +2265,7 @@ function impeHeader(title, extra = "") {
       </h2>
       <div class="impe-head-actions">
         ${extra}
-        <button class="ghost impe-toggle" type="button" aria-expanded="true">Ocultar</button>
+        ${toggle ? `<button class="ghost impe-toggle" type="button" aria-expanded="true">Ocultar</button>` : ""}
       </div>
     </div>
   `;
@@ -2260,7 +2277,7 @@ function renderImpeForm(box, week) {
   const sunday = dateKey(addDays(parseDate(weekStartKey()), 6));
   box.className = "impe-box is-form";
   box.innerHTML = `
-    ${impeHeader(editing ? "Corrige tus impepinables" : "Tus 3 impepinables de la semana")}
+    ${impeHeader(editing ? "Corrige tus impepinables" : "Tus 3 impepinables de la semana", "", { toggle: editing })}
     <p class="impe-copy">${editing
       ? "Puedes corregirlos durante 2 horas desde que los guardaste. Después quedan fijados hasta el lunes."
       : "Tres cosas que vas a hacer <strong>sí o sí</strong> esta semana, aunque todo lo demás se tuerza. Ponle un día a cada una."}</p>
@@ -2366,7 +2383,7 @@ function renderImpeActive(box, week) {
 function renderImpeReview(box, week) {
   box.className = "impe-box is-review";
   box.innerHTML = `
-    ${impeHeader("¿Cumpliste tus impepinables?")}
+    ${impeHeader("¿Cumpliste tus impepinables?", "", { toggle: false })}
     <p class="impe-copy">Antes de poner los de esta semana, cierra la del ${shortDate(parseDate(week.weekStart))}. Si alguno no salió, cuenta en una línea por qué: sirve para ajustar los siguientes.</p>
     <form class="impe-review" id="impeReviewForm">
       ${week.items.map((item) => {
